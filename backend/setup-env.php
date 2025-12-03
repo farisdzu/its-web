@@ -82,11 +82,11 @@ REDIS_CACHE_DB=1
 
 MAIL_MAILER=smtp
 MAIL_SCHEME=null
-MAIL_HOST=smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_FROM_ADDRESS="noreply@its-fkk.local"
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
 MAIL_FROM_NAME="${APP_NAME}"
 
 AWS_ACCESS_KEY_ID=
@@ -151,11 +151,11 @@ REDIS_CACHE_DB=1
 
 MAIL_MAILER=smtp
 MAIL_SCHEME=null
-MAIL_HOST=smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_FROM_ADDRESS="noreply@its-fkk.example.com"
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
 MAIL_FROM_NAME="${APP_NAME}"
 
 AWS_ACCESS_KEY_ID=
