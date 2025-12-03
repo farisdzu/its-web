@@ -73,9 +73,13 @@ ITS (Integrated Task System) adalah aplikasi web berbasis **Laravel 12** (Backen
 
 ### ⚡ Performance
 
-- ✅ **Database Caching** - Cache user data untuk performa optimal
-- ✅ **Database Indexing** - Indexes untuk query yang cepat
+- ✅ **Redis Caching** - Cache, session, dan queue menggunakan Redis (Production)
+- ✅ **Database Caching** - Cache user data untuk performa optimal (Development)
+- ✅ **Database Indexing** - Composite indexes untuk query yang cepat
+- ✅ **Connection Pooling** - Optimasi koneksi database untuk high concurrency
 - ✅ **Eager Loading** - Mengurangi N+1 queries
+- ✅ **Query Scopes** - Reusable query patterns untuk optimasi
+- ✅ **Rate Limiting** - Global 120 req/min untuk mencegah overload
 - ✅ **Code Splitting** - Optimasi bundle size
 - ✅ **Lazy Loading** - Route-based code splitting
 
@@ -87,6 +91,7 @@ ITS (Integrated Task System) adalah aplikasi web berbasis **Laravel 12** (Backen
 - Laravel 12
 - PHP 8.2+
 - MySQL/MariaDB
+- Redis (Production)
 - Laravel Sanctum (Authentication)
 - Pest PHP (Testing)
 
@@ -152,12 +157,18 @@ cd its-fkk
 ```bash
 cd backend
 composer install
-cp .env.example .env
+
+# Setup environment (development - tidak perlu Redis)
+composer run setup:dev
+
+# Generate application key
 php artisan key:generate
 
-# Edit .env file dengan konfigurasi database Anda
+# Run migrations
 php artisan migrate
 php artisan db:seed
+
+# Storage setup
 php artisan storage:link
 ```
 
@@ -274,30 +285,39 @@ npm run lint
 
 ### Environment Variables
 
-**Backend** (`.env`):
+**Backend Environment Setup:**
+
+Gunakan command berikut untuk setup environment:
+
+```bash
+# Development (tidak perlu Redis)
+cd backend
+composer run setup:dev
+
+# Production (perlu Redis)
+composer run setup:prod
+```
+
+File `.env` akan dibuat otomatis dari `.env.development` atau `.env.production`.
+
+**Development Configuration:**
 ```env
-APP_NAME="ITS"
 APP_ENV=local
 APP_DEBUG=true
-APP_URL=http://127.0.0.1:8000
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=its_fkk
-DB_USERNAME=root
-DB_PASSWORD=
-
 CACHE_STORE=database
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+```
 
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_FROM_ADDRESS="noreply@umj.ac.id"
-MAIL_FROM_NAME="ITS"
-
-FRONTEND_URL=http://localhost:5173
-SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1,127.0.0.1:8000
+**Production Configuration:**
+```env
+APP_ENV=production
+APP_DEBUG=false
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
 ```
 
 **Frontend** (`env.development`):
@@ -311,16 +331,19 @@ NODE_ENV=development
 ### Production Checklist
 
 **Backend:**
-- [ ] Set `APP_ENV=production`
-- [ ] Set `APP_DEBUG=false`
-- [ ] Generate new `APP_KEY`
+- [ ] Setup production environment: `composer run setup:prod`
+- [ ] Install dan setup Redis: `sudo apt-get install redis-server`
+- [ ] Pastikan Redis running: `redis-cli ping`
+- [ ] Generate new `APP_KEY`: `php artisan key:generate`
 - [ ] Setup database production
 - [ ] Configure mail settings
+- [ ] Run migrations: `php artisan migrate --force`
 - [ ] Run `php artisan config:cache`
 - [ ] Run `php artisan route:cache`
 - [ ] Run `php artisan view:cache`
 - [ ] Setup HTTPS
 - [ ] Configure CORS origins
+- [ ] Setup queue worker: `php artisan queue:work`
 
 **Frontend:**
 - [ ] Update `env.production` dengan production API URL
@@ -332,6 +355,10 @@ NODE_ENV=development
 
 **Backend:**
 ```bash
+# Setup production environment
+composer run setup:prod
+
+# Optimize
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -372,12 +399,33 @@ npm run build
 
 ## 📈 Performance Optimizations
 
-- ✅ Database caching (5 menit TTL)
-- ✅ Database indexes untuk query optimization
-- ✅ Eager loading untuk relationships
-- ✅ Code splitting di frontend
-- ✅ Asset optimization
-- ✅ Lazy loading routes
+Sistem ini dirancang untuk menangani **1000+ concurrent users** dengan optimasi berikut:
+
+### Backend Optimizations
+
+- ✅ **Redis Caching** - Cache, session, dan queue menggunakan Redis (Production)
+- ✅ **Database Caching** - Cache user data dengan TTL 5 menit (Development)
+- ✅ **Database Connection Pooling** - Optimasi koneksi untuk high concurrency
+- ✅ **Database Indexing** - Composite indexes untuk query patterns yang umum
+- ✅ **Eager Loading** - Mengurangi N+1 queries dengan eager loading
+- ✅ **Query Scopes** - Reusable query patterns untuk optimasi
+- ✅ **Rate Limiting** - Global 120 requests/minute untuk mencegah overload
+- ✅ **Sticky Connections** - Database connection optimization
+
+### Frontend Optimizations
+
+- ✅ **Code Splitting** - Route-based code splitting
+- ✅ **Lazy Loading** - Lazy load components dan routes
+- ✅ **Asset Optimization** - Optimasi bundle size dengan Vite
+- ✅ **Caching Strategy** - API response caching di frontend
+
+### Production Setup
+
+Untuk production, pastikan:
+- ✅ Redis sudah diinstall dan running
+- ✅ Database indexes sudah dibuat
+- ✅ Cache, session, dan queue menggunakan Redis
+- ✅ Rate limiting sudah dikonfigurasi
 
 ## 🤝 Contributing
 

@@ -36,19 +36,30 @@ class AuthController extends Controller
 
         $login = $request->email;
 
-        $user = User::with('activeSessions')
-            ->where('email', $login)
-            ->orWhere('username', $login)
-            ->first();
+        // Optimize: Use cache for user lookup and fix query grouping
+        $cacheKey = "user_login_{$login}";
+        $user = Cache::remember($cacheKey, 300, function () use ($login) {
+            return User::with('activeSessions')
+                ->where(function ($query) use ($login) {
+                    $query->where('email', $login)
+                          ->orWhere('username', $login);
+                })
+                ->first();
+        });
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             $this->incrementRateLimiting($request);
+            // Clear cache on failed login attempt
+            Cache::forget($cacheKey);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Email/username atau password salah.',
             ], 401);
         }
+        
+        // Clear cache on successful login
+        Cache::forget($cacheKey);
 
         if (! $user->is_active) {
             return response()->json([
@@ -384,7 +395,11 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // Optimize: Use cache for user lookup
+        $cacheKey = "user_check_session_{$request->email}";
+        $user = Cache::remember($cacheKey, 60, function () use ($request) {
+            return User::where('email', $request->email)->first();
+        });
 
         if (! $user) {
             return response()->json([
@@ -393,6 +408,7 @@ class AuthController extends Controller
             ]);
         }
 
+        // Optimize: Eager load active sessions
         $existingSession = $user->activeSessions()->first();
 
         return response()->json([

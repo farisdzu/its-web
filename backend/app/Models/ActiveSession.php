@@ -40,4 +40,28 @@ class ActiveSession extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Scope untuk mendapatkan session yang aktif (belum expired)
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('last_activity', '>', now()->subMinutes(config('session.lifetime', 120)));
+    }
+
+    /**
+     * Scope untuk mendapatkan session berdasarkan user
+     */
+    public function scopeByUser($query, int $userId)
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope untuk mendapatkan session berdasarkan token
+     */
+    public function scopeByToken($query, string $tokenId)
+    {
+        return $query->where('token_id', $tokenId);
+    }
 }

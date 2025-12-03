@@ -35,26 +35,30 @@ Route::prefix('auth')->group(function () {
         ->name('auth.password.reset');
 });
 
-// Protected routes (requires authentication)
-Route::middleware('auth:sanctum')->group(function () {
-    // Auth routes - accessible to all authenticated users
-    Route::prefix('auth')->group(function () {
-        Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
-        Route::post('/refresh', [AuthController::class, 'refreshToken'])->name('auth.refresh');
-        Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
-        Route::put('/profile', [AuthController::class, 'updateProfile'])->name('auth.update-profile');
-        Route::put('/change-password', [AuthController::class, 'changePassword'])->name('auth.change-password');
-        Route::post('/avatar', [AuthController::class, 'uploadAvatar'])->name('auth.upload-avatar');
-        Route::delete('/avatar', [AuthController::class, 'deleteAvatar'])->name('auth.delete-avatar');
-    });
+// Global rate limiting untuk semua API routes (120 requests per minute per user/IP)
+// Ini mencegah abuse dan overload server saat banyak user mengakses bersamaan
+Route::middleware('throttle:120,1')->group(function () {
+    // Protected routes (requires authentication)
+    Route::middleware('auth:sanctum')->group(function () {
+        // Auth routes - accessible to all authenticated users
+        Route::prefix('auth')->group(function () {
+            Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+            Route::post('/refresh', [AuthController::class, 'refreshToken'])->name('auth.refresh');
+            Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
+            Route::put('/profile', [AuthController::class, 'updateProfile'])->name('auth.update-profile');
+            Route::put('/change-password', [AuthController::class, 'changePassword'])->name('auth.change-password');
+            Route::post('/avatar', [AuthController::class, 'uploadAvatar'])->name('auth.upload-avatar');
+            Route::delete('/avatar', [AuthController::class, 'deleteAvatar'])->name('auth.delete-avatar');
+        });
 
-    // Example: Role-protected routes
-    // Route::middleware('role:admin')->group(function () {
-    //     Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users.index');
-    // });
-    //
-    // Route::middleware('role:admin,dekan')->group(function () {
-    //     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-    // });
+        // Example: Role-protected routes
+        // Route::middleware('role:admin')->group(function () {
+        //     Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users.index');
+        // });
+        //
+        // Route::middleware('role:admin,dekan')->group(function () {
+        //     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+        // });
+    });
 });
 

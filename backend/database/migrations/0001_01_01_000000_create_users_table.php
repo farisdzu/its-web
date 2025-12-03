@@ -29,6 +29,10 @@ return new class extends Migration
             // Indexes for performance
             $table->index('is_active');
             $table->index('role');
+            // Composite index for common query pattern (email + is_active)
+            $table->index(['email', 'is_active']);
+            // Composite index for username + is_active lookup
+            $table->index(['username', 'is_active']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

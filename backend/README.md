@@ -1,66 +1,83 @@
 # Backend API - Laravel 12
 
-Laravel 12 REST API untuk ITS (Integrated Task System).
+**Laravel 12 REST API untuk ITS (Integrated Task System)**
+
+Backend API untuk sistem manajemen tugas terintegrasi menggunakan Laravel 12 dengan arsitektur RESTful API. Sistem ini dirancang untuk menangani 1000+ concurrent users dengan optimasi Redis, caching, dan rate limiting.
 
 ## 📋 Requirements
 
 - PHP >= 8.2
-- Composer
+- Composer >= 2.0
 - Node.js & NPM
-- Database: MySQL/MariaDB/PostgreSQL/SQLite
+- MySQL >= 8.0
+- Redis >= 6.0 (untuk production)
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+
+- PHP >= 8.2
+- Composer >= 2.0
+- MySQL >= 8.0
+- Redis >= 6.0 (untuk production)
+
+### Installation
 
 ```bash
+# Install dependencies
 composer install
-npm install
-```
 
-### 2. Environment Setup
+# Setup environment
+composer run setup:dev  # Development (tidak perlu Redis)
+# atau
+composer run setup:prod # Production (perlu Redis)
 
-```bash
-cp .env.example .env
+# Generate application key
 php artisan key:generate
-```
 
-### 3. Database Setup
-
-Edit `.env`:
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=its_fkk
-DB_USERNAME=root
-DB_PASSWORD=
-```
-
-Jalankan migrations:
-```bash
+# Run migrations
 php artisan migrate
+
+# Seed database
 php artisan db:seed
-```
 
-### 4. Storage Setup
-
-```bash
+# Storage setup
 php artisan storage:link
 ```
 
-### 5. Run Server
+### Development Server
 
 ```bash
-# Development
+# Run development server dengan queue worker
 composer run dev
 
-# Or separately
+# Atau manual
 php artisan serve
-npm run dev
+php artisan queue:listen
 ```
 
 Server: `http://127.0.0.1:8000`
+
+## 📁 Struktur Direktori
+
+```
+backend/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/  # API Controllers
+│   │   ├── Middleware/   # Custom middleware
+│   │   └── Requests/     # Form Request validation
+│   ├── Models/           # Eloquent models
+│   ├── Mail/            # Email classes
+│   └── Providers/       # Service providers
+├── config/               # Configuration files
+├── database/
+│   ├── migrations/       # Database migrations
+│   └── seeders/         # Database seeders
+├── routes/
+│   └── api.php          # API routes
+└── storage/             # Storage files
+```
 
 ## 📚 API Endpoints
 
@@ -108,9 +125,10 @@ Token expires setelah 24 jam dan dapat di-refresh.
 
 ### Rate Limiting
 
-- Login: 10 requests/minute
-- Password reset: 5 requests/minute
-- Custom: 5 failed attempts = 5 minutes lockout
+- **Global API**: 120 requests/minute (semua routes)
+- **Login**: 10 requests/minute
+- **Password reset**: 5 requests/minute
+- **Custom**: 5 failed attempts = 5 minutes lockout
 
 ### Security Headers
 
@@ -120,12 +138,58 @@ Token expires setelah 24 jam dan dapat di-refresh.
 - Content-Security-Policy (production)
 - Strict-Transport-Security (HTTPS)
 
+## 🔧 Configuration
+
+### Environment Setup
+
+File `.env` dikelola melalui command:
+- `composer run setup:dev` - Setup untuk development (menggunakan database cache, tidak perlu Redis)
+- `composer run setup:prod` - Setup untuk production (menggunakan Redis)
+
+**Development (.env.development)**:
+```env
+APP_ENV=local
+APP_DEBUG=true
+CACHE_STORE=database
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+```
+
+**Production (.env.production)**:
+```env
+APP_ENV=production
+APP_DEBUG=false
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+### Redis Setup (Production)
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install redis-server
+
+# Start Redis
+sudo systemctl start redis-server
+sudo systemctl enable redis-server
+
+# Test Redis
+redis-cli ping  # Harus return PONG
+```
+
 ## 💾 Caching
 
-Menggunakan **Database Cache** (default).
+### Development Mode
+Menggunakan **Database Cache** (tidak perlu Redis).
 
 ```env
 CACHE_STORE=database
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
 ```
 
 **Features:**
@@ -133,6 +197,21 @@ CACHE_STORE=database
 - Rate limiting storage
 - Auto-cleanup expired entries
 - Cache invalidation pada semua update operations
+
+### Production Mode
+Menggunakan **Redis** untuk performa optimal.
+
+```env
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+```
+
+**Benefits:**
+- Lebih cepat dari database cache
+- Mendukung 1000+ concurrent users
+- Session management yang efisien
+- Queue processing yang scalable
 
 ## 🧪 Testing
 
@@ -155,34 +234,16 @@ php artisan migrate:fresh --seed
 
 ### Indexes
 
-Database sudah dioptimasi dengan indexes untuk performa optimal.
+Database sudah dioptimasi dengan indexes untuk performa optimal:
+- Composite indexes untuk query patterns yang umum
+- Indexes pada kolom yang sering di-query (email, username, role, is_active)
+- Foreign key indexes untuk relationships
 
 ## 📝 Environment Variables
 
-```env
-APP_NAME="ITS"
-APP_ENV=local
-APP_DEBUG=true
-APP_URL=http://127.0.0.1:8000
+File `.env` dikelola melalui command `composer run setup:dev` atau `composer run setup:prod`.
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=its_fkk
-DB_USERNAME=root
-DB_PASSWORD=
-
-CACHE_STORE=database
-
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_FROM_ADDRESS="noreply@umj.ac.id"
-MAIL_FROM_NAME="ITS"
-
-FRONTEND_URL=http://localhost:5173
-SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1,127.0.0.1:8000
-```
+**Lihat section [Configuration](#-configuration) untuk detail setup environment.**
 
 ## 👥 Default Users
 
@@ -197,16 +258,38 @@ SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1,127.0.0.1:8000
 
 ## 🚀 Production Deployment
 
+### Setup Production Environment
+
 ```bash
+# Setup production environment (menggunakan Redis)
+composer run setup:prod
+
+# Pastikan Redis sudah running
+redis-cli ping  # Harus return PONG
+
+# Generate application key
+php artisan key:generate
+
+# Run migrations
+php artisan migrate --force
+
 # Optimize
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-
-# Set environment
-APP_ENV=production
-APP_DEBUG=false
 ```
+
+### Performance Optimization
+
+Sistem ini sudah dioptimasi untuk menangani 1000+ concurrent users dengan:
+
+- ✅ **Database Connection Pooling** - Optimasi koneksi database
+- ✅ **Redis Caching** - Cache, session, dan queue menggunakan Redis
+- ✅ **Database Indexing** - Composite indexes untuk query optimization
+- ✅ **Eager Loading** - Mengurangi N+1 queries
+- ✅ **Query Scopes** - Reusable query patterns
+- ✅ **Rate Limiting** - Global 120 req/min untuk mencegah overload
+- ✅ **Caching Strategy** - User data caching dengan TTL yang tepat
 
 ## 📄 License
 

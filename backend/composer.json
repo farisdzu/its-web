@@ -46,6 +46,12 @@
             "npm install",
             "npm run build"
         ],
+        "setup:dev": [
+            "@php setup-env.php development"
+        ],
+        "setup:prod": [
+            "@php setup-env.php production"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"npm run dev\" --names='server,queue,vite'"

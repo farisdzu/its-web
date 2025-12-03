@@ -18,6 +18,10 @@ return new class extends Migration
             $table->timestamp('expires_at');
             $table->boolean('is_verified')->default(false);
             $table->timestamps();
+
+            // Composite indexes for common query patterns
+            $table->index(['email', 'otp', 'is_verified']);
+            $table->index('expires_at');
         });
     }
 

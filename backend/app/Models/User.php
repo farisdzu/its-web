@@ -57,6 +57,35 @@ class User extends Authenticatable
         return $this->hasMany(ActiveSession::class);
     }
 
+    /**
+     * Scope untuk mendapatkan user yang aktif
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope untuk mendapatkan user berdasarkan role
+     */
+    public function scopeByRole($query, string $role)
+    {
+        return $query->where('role', $role);
+    }
+
+    /**
+     * Scope untuk mencari user berdasarkan nama, email, atau username
+     */
+    public function scopeSearch($query, string $keyword)
+    {
+        return $query->where(function ($q) use ($keyword) {
+            $q->where('name', 'like', "%{$keyword}%")
+              ->orWhere('email', 'like', "%{$keyword}%")
+              ->orWhere('username', 'like', "%{$keyword}%")
+              ->orWhere('employee_id', 'like', "%{$keyword}%");
+        });
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->role === $role;
