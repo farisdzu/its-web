@@ -32,8 +32,7 @@ composer run setup:dev  # Development (tidak perlu Redis)
 # atau
 composer run setup:prod # Production (perlu Redis)
 
-# Generate application key
-php artisan key:generate
+# APP_KEY akan auto-generate saat setup (jika kosong)
 
 # Run migrations
 php artisan migrate
@@ -146,25 +145,59 @@ File `.env` dikelola melalui command:
 - `composer run setup:dev` - Setup untuk development (menggunakan database cache, tidak perlu Redis)
 - `composer run setup:prod` - Setup untuk production (menggunakan Redis)
 
+**Fitur Otomatis:**
+- ✅ **Auto-generate APP_KEY** - Jika `APP_KEY` kosong, akan di-generate otomatis
+- ✅ **Auto-clear cache** - Otomatis clear config, cache, route, dan view cache setelah setup
+- ✅ **Email configuration** - Konfigurasi email Gmail sudah ter-setup
+
 **Development (.env.development)**:
 ```env
 APP_ENV=local
 APP_DEBUG=true
+APP_KEY=                    # Auto-generate saat setup
 CACHE_STORE=database
 SESSION_DRIVER=database
 QUEUE_CONNECTION=database
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 **Production (.env.production)**:
 ```env
 APP_ENV=production
 APP_DEBUG=false
+APP_KEY=                    # Auto-generate saat setup
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
+
+### Email Configuration
+
+Sistem menggunakan **Gmail SMTP** untuk pengiriman email (OTP, notifikasi, dll).
+
+**Setup Gmail App Password:**
+1. Aktifkan 2-Step Verification di Google Account
+2. Buat App Password: https://myaccount.google.com/apppasswords
+3. Gunakan App Password sebagai `MAIL_PASSWORD` (bukan password biasa)
+
+**Catatan:**
+- Email akan otomatis dikonfigurasi saat menjalankan `composer run setup:dev` atau `composer run setup:prod`
+- Untuk production, pertimbangkan menggunakan service email khusus (SendGrid, Mailgun, dll)
 
 ### Redis Setup (Production)
 
@@ -267,13 +300,12 @@ composer run setup:prod
 # Pastikan Redis sudah running
 redis-cli ping  # Harus return PONG
 
-# Generate application key
-php artisan key:generate
+# APP_KEY sudah auto-generate saat setup (jika kosong)
 
 # Run migrations
 php artisan migrate --force
 
-# Optimize
+# Optimize (cache sudah di-clear otomatis saat setup)
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache

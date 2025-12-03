@@ -161,8 +161,7 @@ composer install
 # Setup environment (development - tidak perlu Redis)
 composer run setup:dev
 
-# Generate application key
-php artisan key:generate
+# APP_KEY akan auto-generate saat setup (jika kosong)
 
 # Run migrations
 php artisan migrate
@@ -304,21 +303,42 @@ File `.env` akan dibuat otomatis dari `.env.development` atau `.env.production`.
 ```env
 APP_ENV=local
 APP_DEBUG=true
+APP_KEY=                    # Auto-generate saat setup
 CACHE_STORE=database
 SESSION_DRIVER=database
 QUEUE_CONNECTION=database
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 **Production Configuration:**
 ```env
 APP_ENV=production
 APP_DEBUG=false
+APP_KEY=                    # Auto-generate saat setup
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=epicgsnew20@gmail.com
+MAIL_PASSWORD="gpon stlr elhd rmcx"
+MAIL_FROM_ADDRESS="epicgsnew20@gmail.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
+
+**Fitur Otomatis:**
+- ✅ **Auto-generate APP_KEY** - Jika `APP_KEY` kosong, akan di-generate otomatis
+- ✅ **Auto-clear cache** - Otomatis clear config, cache, route, dan view cache setelah setup
+- ✅ **Email configuration** - Konfigurasi email Gmail sudah ter-setup
 
 **Frontend** (`env.development`):
 ```env
@@ -334,9 +354,9 @@ NODE_ENV=development
 - [ ] Setup production environment: `composer run setup:prod`
 - [ ] Install dan setup Redis: `sudo apt-get install redis-server`
 - [ ] Pastikan Redis running: `redis-cli ping`
-- [ ] Generate new `APP_KEY`: `php artisan key:generate`
+- [ ] APP_KEY sudah auto-generate saat setup (jika kosong)
 - [ ] Setup database production
-- [ ] Configure mail settings
+- [ ] Email sudah terkonfigurasi (Gmail SMTP)
 - [ ] Run migrations: `php artisan migrate --force`
 - [ ] Run `php artisan config:cache`
 - [ ] Run `php artisan route:cache`
