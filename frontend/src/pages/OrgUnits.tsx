@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
 import { Modal } from "../components/ui/modal";
+import { ConfirmDialog } from "../components/ui/dialog";
+import { LoadingSpinner, SpinnerIcon } from "../components/ui/loading";
+import { EmptyState } from "../components/ui/empty";
 import Input from "../components/form/input/InputField";
 import Label from "../components/form/Label";
 import Checkbox from "../components/form/input/Checkbox";
 import SelectField from "../components/form/input/SelectField";
+import { ChevronDownIcon } from "../icons";
 import { orgUnitApi, OrgUnitPayload, OrgUnitTreeNode } from "../services/api";
 import ToastContainer from "../components/ui/toast/ToastContainer";
 import { useToast } from "../context/ToastContext";
@@ -26,6 +30,12 @@ export default function OrgUnits() {
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: number | null; name: string }>({
+    isOpen: false,
+    id: null,
+    name: "",
+  });
+  const [deleting, setDeleting] = useState<boolean>(false);
   const [form, setForm] = useState<FormState>({
     name: "",
     parent_id: null,
@@ -125,16 +135,30 @@ export default function OrgUnits() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Hapus unit ini? Pastikan tidak ada child/user.")) return;
+  const handleDeleteClick = (id: number, name: string) => {
+    setDeleteConfirm({ isOpen: true, id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.id) return;
+
+    setDeleting(true);
     try {
-      const res = await orgUnitApi.remove(id);
+      const res = await orgUnitApi.remove(deleteConfirm.id);
       if (!res.success) throw new Error(res.message || "Gagal menghapus.");
       showSuccess("Unit dihapus.");
+      setDeleteConfirm({ isOpen: false, id: null, name: "" });
       await loadTree();
     } catch (error: any) {
       console.error(error);
+      showSuccess(error?.message || "Gagal menghapus unit.");
+    } finally {
+      setDeleting(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ isOpen: false, id: null, name: "" });
   };
 
   return (
@@ -156,15 +180,25 @@ export default function OrgUnits() {
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-6">Memuat struktur...</div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-8">
+            <LoadingSpinner size="md" text="Memuat struktur..." />
+          </div>
         ) : (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3">
             {tree.length === 0 ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">Belum ada data. Tambah root untuk memulai.</div>
+              <EmptyState
+                title="Belum ada data"
+                description="Tambahkan root untuk memulai struktur organisasi"
+                action={
+                  <Button variant="primary" size="sm" onClick={() => openCreate(null)}>
+                    + Tambah Root
+                  </Button>
+                }
+              />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {tree.map((node) => (
-                  <TreeNode key={node.id} node={node} onCreate={openCreate} onEdit={openEdit} onDelete={handleDelete} level={0} />
+                  <TreeNode key={node.id} node={node} onCreate={openCreate} onEdit={openEdit} onDelete={handleDeleteClick} level={0} />
                 ))}
               </div>
             )}
@@ -260,25 +294,7 @@ export default function OrgUnits() {
               >
                 {saving ? (
                   <span className="flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
+                    <SpinnerIcon size="sm" />
                     Menyimpan...
                   </span>
                 ) : (
@@ -289,6 +305,28 @@ export default function OrgUnits() {
           </form>
         </div>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Unit Organisasi"
+        message={
+          <>
+            Apakah Anda yakin ingin menghapus unit{" "}
+            <span className="font-medium text-gray-900 dark:text-white">
+              "{deleteConfirm.name}"
+            </span>
+            ?
+          </>
+        }
+        description="Pastikan tidak ada child atau user yang terhubung dengan unit ini. Tindakan ini tidak dapat dibatalkan."
+        confirmText="Hapus"
+        cancelText="Batal"
+        variant="danger"
+        isLoading={deleting}
+      />
     </>
   );
 }
@@ -299,58 +337,137 @@ function TreeNode({
   onCreate,
   onEdit,
   onDelete,
+  isLast = false,
+  parentPath = [],
 }: {
   node: OrgUnitTreeNode;
   level: number;
   onCreate: (parentId: number | null) => void;
   onEdit: (node: OrgUnitTreeNode) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number, name: string) => void;
+  isLast?: boolean;
+  parentPath?: boolean[];
 }) {
-  const indent = level * 16;
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = Boolean(node.children && node.children.length > 0);
+  const indentSize = 20;
+
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3" style={{ position: 'relative' }}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2" style={{ paddingLeft: indent }}>
-          <div className="h-2 w-2 rounded-full bg-emerald-500" />
-          <div>
-            <div className="text-sm font-semibold text-gray-800 dark:text-white/90">{node.name}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {node.type || "Bagian"} · {node.is_active ? "Aktif" : "Nonaktif"}
+    <div className="relative">
+      <div className="relative flex items-start">
+        {/* Expand/Collapse Button */}
+        {hasChildren ? (
+          <button
+            type="button"
+            className="flex items-center justify-center w-5 h-5 min-w-5 min-h-5 mt-0.5 rounded-md transition-all duration-200 shrink-0 mr-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+            style={{ marginLeft: `${level * indentSize}px` }}
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? "Tutup" : "Buka"}
+            aria-label={isExpanded ? "Tutup" : "Buka"}
+          >
+            <ChevronDownIcon 
+              className={`w-4 h-4 text-gray-600 dark:text-gray-400 shrink-0 transition-transform duration-200 ${
+                isExpanded ? 'rotate-0' : '-rotate-90'
+              }`}
+            />
+          </button>
+        ) : (
+          <div
+            className="w-5 h-5 shrink-0 mr-2"
+            style={{ marginLeft: `${level * indentSize}px` }}
+          />
+        )}
+
+        {/* Content Card */}
+        <div className="flex-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-2.5 hover:border-brand-300 dark:hover:border-brand-700 transition-colors ml-1">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              {/* Status Indicator */}
+              <div className={`h-2 w-2 rounded-full shrink-0 ${node.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+              
+              {/* Unit Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
+                    {node.name}
+                  </div>
+                  {level > 0 && (
+                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 shrink-0">
+                      L{level + 1}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {node.type || "Bagian"} · {node.is_active ? "Aktif" : "Nonaktif"}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0" style={{ position: 'relative', zIndex: 10 }}>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => onCreate(node.id)}
+                type="button"
+              >
+                + Child
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => onEdit(node)}
+                type="button"
+              >
+                Edit
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => onDelete(node.id, node.name)}
+                type="button"
+              >
+                Hapus
+              </Button>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 10 }}>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => onCreate(node.id)}
-            type="button"
-          >
-            + Child
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => onEdit(node)}
-            type="button"
-          >
-            Edit
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => onDelete(node.id)}
-            type="button"
-          >
-            Hapus
-          </Button>
-        </div>
       </div>
-      {node.children && node.children.length > 0 && (
-        <div className="mt-2 space-y-2">
-          {node.children.map((child) => (
-            <TreeNode key={child.id} node={child} level={level + 1} onCreate={onCreate} onEdit={onEdit} onDelete={onDelete} />
-          ))}
+
+      {/* Children */}
+      {hasChildren && (
+        <div
+          className="relative overflow-hidden"
+          style={{
+            display: 'grid',
+            gridTemplateRows: isExpanded ? '1fr' : '0fr',
+            transition: 'grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            marginTop: isExpanded ? '0.5rem' : '0',
+          }}
+        >
+          <div
+            className="overflow-hidden min-h-0"
+            style={{
+              opacity: isExpanded ? 1 : 0,
+              transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionDelay: isExpanded ? '0.05s' : '0s',
+            }}
+          >
+            <div className="space-y-1.5">
+              {node.children.map((child, index) => (
+                <TreeNode
+                  key={child.id}
+                  node={child}
+                  level={level + 1}
+                  onCreate={onCreate}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  isLast={index === node.children!.length - 1}
+                  parentPath={[...parentPath, !isLast]}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
