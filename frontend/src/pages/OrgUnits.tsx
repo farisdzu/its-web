@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
+import { Modal } from "../components/ui/modal";
+import Input from "../components/form/input/InputField";
+import Label from "../components/form/Label";
+import Checkbox from "../components/form/input/Checkbox";
+import SelectField from "../components/form/input/SelectField";
 import { orgUnitApi, OrgUnitPayload, OrgUnitTreeNode } from "../services/api";
 import ToastContainer from "../components/ui/toast/ToastContainer";
 import { useToast } from "../context/ToastContext";
@@ -20,6 +25,7 @@ export default function OrgUnits() {
   const [tree, setTree] = useState<OrgUnitTreeNode[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [form, setForm] = useState<FormState>({
     name: "",
     parent_id: null,
@@ -61,16 +67,15 @@ export default function OrgUnits() {
     });
   };
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetForm();
+  };
+
   const openCreate = (parentId: number | null) => {
     resetForm();
     setForm((prev) => ({ ...prev, parent_id: parentId }));
-    // Scroll to form
-    setTimeout(() => {
-      const formElement = document.querySelector('[data-org-form]');
-      if (formElement) {
-        formElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 100);
+    setIsModalOpen(true);
   };
 
   const openEdit = (node: OrgUnitTreeNode) => {
@@ -83,6 +88,7 @@ export default function OrgUnits() {
       order: node.order,
       is_active: node.is_active,
     });
+    setIsModalOpen(true);
   };
 
   const handleSave = async () => {
@@ -108,6 +114,7 @@ export default function OrgUnits() {
       }
 
       resetForm();
+      setIsModalOpen(false);
       await loadTree();
     } catch (error: any) {
       const errorMessage = error?.message || "Gagal menyimpan.";
@@ -163,68 +170,125 @@ export default function OrgUnits() {
             )}
           </div>
         )}
-
-        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3" data-org-form>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              {form.id ? "Edit Bagian" : "Tambah Bagian"}
-            </h2>
-            {form.id && (
-              <Button variant="ghost" size="sm" onClick={resetForm}>
-                + Baru
-              </Button>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="Nama bagian"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Parent</label>
-            <select
-              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-              value={form.parent_id ?? ""}
-              onChange={(e) => {
-                const val = e.target.value === "" ? null : Number(e.target.value);
-                setForm((prev) => ({ ...prev, parent_id: val }));
-              }}
-            >
-              <option value="">(Root)</option>
-              {flatUnits
-                .filter((u) => u.id !== form.id)
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.indentLabel}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              id="is_active"
-              type="checkbox"
-              checked={form.is_active ?? true}
-              onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-            />
-            <label htmlFor="is_active" className="text-sm text-gray-700 dark:text-gray-300">
-              Aktif
-            </label>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={resetForm}>
-              Reset
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
-              {saving ? "Menyimpan..." : "Simpan"}
-            </Button>
-          </div>
-        </div>
       </div>
+
+      {/* Modal Form */}
+      <Modal isOpen={isModalOpen} onClose={closeModal} className="max-w-[600px] m-4">
+        <div className="no-scrollbar relative w-full max-w-[600px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-8">
+          <div className="px-2 pr-14">
+            <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
+              {form.id ? "Edit Bagian" : "Tambah Bagian"}
+            </h4>
+            <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
+              {form.id 
+                ? "Perbarui informasi bagian organisasi."
+                : "Tambahkan bagian baru ke struktur organisasi."}
+            </p>
+          </div>
+          
+          <form 
+            className="flex flex-col"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSave();
+            }}
+          >
+            <div className="px-2 pb-3 space-y-5">
+              <div>
+                <Label htmlFor="name">
+                  Nama Bagian <span className="text-error-500">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nama bagian"
+                  disabled={saving}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="parent_id">Parent</Label>
+                <SelectField
+                  id="parent_id"
+                  value={form.parent_id}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? null : Number(e.target.value);
+                    setForm((prev) => ({ ...prev, parent_id: val }));
+                  }}
+                  options={[
+                    { value: "", label: "(Root)" },
+                    ...flatUnits
+                      .filter((u) => u.id !== form.id)
+                      .map((u) => ({
+                        value: u.id,
+                        label: u.indentLabel,
+                      })),
+                  ]}
+                  placeholder="(Root)"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <Checkbox
+                  id="is_active"
+                  label="Aktif"
+                  checked={form.is_active ?? true}
+                  onChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                type="button"
+                onClick={closeModal}
+                disabled={saving}
+              >
+                Batal
+              </Button>
+              <Button 
+                size="sm" 
+                type="submit"
+                disabled={saving || !form.name.trim()}
+              >
+                {saving ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="w-4 h-4 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Menyimpan...
+                  </span>
+                ) : (
+                  'Simpan'
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -259,35 +323,23 @@ function TreeNode({
           <Button 
             size="sm" 
             variant="outline" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onCreate(node.id);
-            }}
+            onClick={() => onCreate(node.id)}
             type="button"
           >
             + Child
           </Button>
           <Button 
             size="sm" 
-            variant="ghost" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit(node);
-            }}
+            variant="outline" 
+            onClick={() => onEdit(node)}
             type="button"
           >
             Edit
           </Button>
           <Button 
             size="sm" 
-            variant="ghost" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete(node.id);
-            }}
+            variant="outline" 
+            onClick={() => onDelete(node.id)}
             type="button"
           >
             Hapus
