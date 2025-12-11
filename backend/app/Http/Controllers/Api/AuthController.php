@@ -12,6 +12,7 @@ use App\Http\Requests\Auth\UploadAvatarRequest;
 use App\Http\Requests\Auth\VerifyPasswordResetOTPRequest;
 use App\Mail\PasswordResetOTP as PasswordResetOTPMail;
 use App\Models\ActiveSession;
+use App\Models\OrgUnit;
 use App\Models\PasswordResetOTP;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -138,6 +139,9 @@ class AuthController extends Controller
                     'avatar' => $user->avatar ? Storage::url($user->avatar) : null,
                     'role' => $user->role,
                     'employee_id' => $user->employee_id,
+                    'org_unit_id' => $user->org_unit_id,
+                    'org_unit_name' => $user->orgUnit?->name,
+                    'title' => $user->title,
                 ],
                 'token' => $token->plainTextToken,
                 'token_type' => 'Bearer',
@@ -208,6 +212,9 @@ class AuthController extends Controller
                 'avatar' => $user->avatar ? Storage::url($user->avatar) : null,
                 'role' => $user->role,
                 'employee_id' => $user->employee_id,
+                'org_unit_id' => $user->org_unit_id,
+                'org_unit_name' => $user->orgUnit?->name,
+                'title' => $user->title,
                 'redirect_to' => $user->getDashboardRoute(),
             ]
         );
@@ -233,6 +240,14 @@ class AuthController extends Controller
                 $updateData['username'] = $request->username ?: null;
             }
 
+            if ($request->has('org_unit_id')) {
+                $updateData['org_unit_id'] = $request->org_unit_id ?: null;
+            }
+
+            if ($request->has('title')) {
+                $updateData['title'] = $request->title ?: null;
+            }
+
             $user->update($updateData);
 
             Cache::forget("user_{$user->id}");
@@ -249,6 +264,9 @@ class AuthController extends Controller
                     'avatar' => $user->avatar ? Storage::url($user->avatar) : null,
                     'role' => $user->role,
                     'employee_id' => $user->employee_id,
+                    'org_unit_id' => $user->org_unit_id,
+                    'org_unit_name' => $user->orgUnit?->name,
+                    'title' => $user->title,
                 ],
             ]);
         } catch (\Exception $e) {

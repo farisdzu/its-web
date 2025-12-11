@@ -38,6 +38,15 @@ const AppSidebar: React.FC = () => {
           name: "Dashboard",
           path: getDashboardPath(user.role),
         },
+        ...(user.role === "admin"
+          ? [
+              {
+                icon: <GridIcon />,
+                name: "Struktur Organisasi",
+                path: "/org-units",
+              },
+            ]
+          : []),
       ]
     : [];
 

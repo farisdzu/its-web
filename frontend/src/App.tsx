@@ -15,6 +15,7 @@ import DashboardDekan from "./pages/Dashboard/Dekan/Index";
 import DashboardUnit from "./pages/Dashboard/Unit/Index";
 import DashboardSDM from "./pages/Dashboard/SDM/Index";
 import UserProfiles from "./pages/UserProfiles";
+import OrgUnits from "./pages/OrgUnits";
 
 // Root redirect component - redirects to user's dashboard based on role
 function RootRedirect() {
@@ -87,6 +88,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={["sdm"]}>
                   <DashboardSDM />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/org-units"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <OrgUnits />
                 </ProtectedRoute>
               }
             />

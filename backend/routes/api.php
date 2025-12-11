@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\OrgUnitController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,6 +50,13 @@ Route::middleware('throttle:120,1')->group(function () {
             Route::put('/change-password', [AuthController::class, 'changePassword'])->name('auth.change-password');
             Route::post('/avatar', [AuthController::class, 'uploadAvatar'])->name('auth.upload-avatar');
             Route::delete('/avatar', [AuthController::class, 'deleteAvatar'])->name('auth.delete-avatar');
+        });
+
+        Route::middleware('role:admin')->prefix('org-units')->group(function () {
+            Route::get('/', [OrgUnitController::class, 'index'])->name('org-units.index');
+            Route::post('/', [OrgUnitController::class, 'store'])->name('org-units.store');
+            Route::patch('/{orgUnit}', [OrgUnitController::class, 'update'])->name('org-units.update');
+            Route::delete('/{orgUnit}', [OrgUnitController::class, 'destroy'])->name('org-units.destroy');
         });
 
         // Example: Role-protected routes

@@ -21,6 +21,8 @@ class UpdateProfileRequest extends FormRequest
             'username' => ['nullable', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:20'],
+            'org_unit_id' => ['nullable', 'exists:org_units,id'],
+            'title' => ['nullable', 'string', 'max:255'],
         ];
     }
 

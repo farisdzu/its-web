@@ -14,6 +14,9 @@ export interface User {
   avatar: string | null;
   role: 'admin' | 'dekan' | 'unit' | 'sdm';
   employee_id: string | null;
+  org_unit_id?: number | null;
+  org_unit_name?: string | null;
+  title?: string | null;
 }
 
 export interface LoginResponse {
@@ -48,6 +51,26 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
+}
+
+export interface OrgUnitTreeNode {
+  id: number;
+  name: string;
+  type: string | null;
+  code: string | null;
+  order: number;
+  is_active: boolean;
+  parent_id: number | null;
+  children: OrgUnitTreeNode[];
+}
+
+export interface OrgUnitPayload {
+  name: string;
+  parent_id?: number | null;
+  type?: string | null;
+  code?: string | null;
+  order?: number | null;
+  is_active?: boolean;
 }
 
 const TOKEN_KEY = 'its_auth_token';
@@ -92,6 +115,25 @@ export const removeStoredUser = (): void => {
 export const clearAuthData = (): void => {
   removeToken();
   removeStoredUser();
+};
+
+const orgUnitApi = {
+  getTree: async (): Promise<ApiResponse<OrgUnitTreeNode[]>> => {
+    const response = await api.get<ApiResponse<OrgUnitTreeNode[]>>('/org-units');
+    return response.data;
+  },
+  create: async (payload: OrgUnitPayload): Promise<ApiResponse<OrgUnitTreeNode>> => {
+    const response = await api.post<ApiResponse<OrgUnitTreeNode>>('/org-units', payload);
+    return response.data;
+  },
+  update: async (id: number, payload: Partial<OrgUnitPayload>): Promise<ApiResponse<OrgUnitTreeNode>> => {
+    const response = await api.patch<ApiResponse<OrgUnitTreeNode>>(`/org-units/${id}`, payload);
+    return response.data;
+  },
+  remove: async (id: number): Promise<ApiResponse> => {
+    const response = await api.delete<ApiResponse>(`/org-units/${id}`);
+    return response.data;
+  },
 };
 
 let isRefreshing = false;
@@ -386,6 +428,8 @@ export const authApi = {
     username?: string | null;
     email: string;
     phone?: string | null;
+    org_unit_id?: number | null;
+    title?: string | null;
   }): Promise<ApiResponse<User>> => {
     const response = await api.put<ApiResponse<User>>('/auth/profile', data);
 
@@ -467,5 +511,5 @@ export const authApi = {
   },
 };
 
-export { api };
+export { api, orgUnitApi };
 export default api;

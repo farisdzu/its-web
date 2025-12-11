@@ -6,7 +6,7 @@ import Input from "../form/input/InputField";
 import Label from "../form/Label";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-import { authApi } from "../../services/api";
+import { authApi, orgUnitApi, OrgUnitTreeNode } from "../../services/api";
 import { formatIndonesianPhone, formatPhoneInput, getRawPhone } from "../../utils/phone";
 
 export default function UserInfoCard() {
@@ -20,7 +20,21 @@ export default function UserInfoCard() {
     username: "",
     email: "",
     phone: "",
+    org_unit_id: "" as string | number | null,
+    title: "",
   });
+  const [orgUnits, setOrgUnits] = useState<OrgUnitTreeNode[]>([]);
+  const [orgLoading, setOrgLoading] = useState(false);
+  const flattenOrg = (nodes: OrgUnitTreeNode[], level = 0): { id: number; label: string }[] => {
+    const result: { id: number; label: string }[] = [];
+    nodes.forEach((n) => {
+      result.push({ id: n.id, label: `${"-- ".repeat(level)}${n.name}` });
+      if (n.children && n.children.length > 0) {
+        result.push(...flattenOrg(n.children, level + 1));
+      }
+    });
+    return result;
+  };
 
   useEffect(() => {
     if (user && isOpen) {
@@ -29,10 +43,32 @@ export default function UserInfoCard() {
         username: user.username || "",
         email: user.email || "",
         phone: formatIndonesianPhone(user.phone),
+        org_unit_id: user.org_unit_id ?? "",
+        title: user.title || "",
       });
       setError(null);
     }
   }, [user, isOpen]);
+
+  useEffect(() => {
+    const loadOrg = async () => {
+      setOrgLoading(true);
+      try {
+        const res = await orgUnitApi.getTree();
+        if (res.success && res.data) {
+          setOrgUnits(res.data);
+        }
+      } catch {
+        // ignore load failure
+      } finally {
+        setOrgLoading(false);
+      }
+    };
+
+    if (isOpen && orgUnits.length === 0) {
+      loadOrg();
+    }
+  }, [isOpen, orgUnits.length]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -48,6 +84,8 @@ export default function UserInfoCard() {
         username: formData.username || null,
         email: formData.email,
         phone: formattedPhone,
+        org_unit_id: formData.org_unit_id === "" ? null : Number(formData.org_unit_id),
+        title: formData.title || null,
       });
 
       if (response.success) {
@@ -127,6 +165,24 @@ export default function UserInfoCard() {
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
                 {user?.role === 'admin' ? 'Admin' : user?.role === 'dekan' ? 'Dekan' : user?.role === 'unit' ? 'Kepala Unit' : 'SDM'}
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
+                Jabatan (Title)
+              </p>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                {user?.title || "-"}
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
+                Bagian / Org Unit
+              </p>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                {user?.org_unit_name || "-"}
               </p>
             </div>
           </div>
@@ -225,6 +281,37 @@ export default function UserInfoCard() {
                     }}
                     disabled={isLoading}
                     placeholder="+62 822-6281-8869"
+                  />
+                </div>
+
+                <div>
+                  <Label>Bagian / Org Unit</Label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                    value={formData.org_unit_id ?? ""}
+                    onChange={(e) => setFormData({ ...formData, org_unit_id: e.target.value === "" ? "" : Number(e.target.value) })}
+                    disabled={isLoading || orgLoading}
+                  >
+                    <option value="">(Tidak ada / root)</option>
+                    {flattenOrg(orgUnits).map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Pilih bagian sesuai struktur. Admin dapat mengubah strukturnya di menu Struktur Organisasi.
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Jabatan (Title)</Label>
+                  <Input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    disabled={isLoading}
+                    placeholder="mis. Wadek I, Kaprodi S1, Koord Lab"
                   />
                 </div>
 

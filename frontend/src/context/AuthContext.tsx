@@ -97,6 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar: response.data.avatar,
           role: response.data.role,
           employee_id: response.data.employee_id,
+          org_unit_id: response.data.org_unit_id,
+          org_unit_name: response.data.org_unit_name,
+          title: response.data.title,
         };
         setUser(userData);
         setStoredUser(userData);
