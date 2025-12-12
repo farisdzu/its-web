@@ -31,8 +31,11 @@ export default function Toast({ toast, onClose }: ToastProps) {
     }, 300);
   };
 
-  // Toast hanya untuk success
-  const containerClass = 'bg-success-500 dark:bg-success-600';
+  // Toast variant styling
+  const variant = toast.variant || 'success';
+  const containerClass = variant === 'error' 
+    ? 'bg-error-500 dark:bg-error-600' 
+    : 'bg-success-500 dark:bg-success-600';
   const iconClass = 'text-white';
   const textClass = 'text-white';
 
@@ -52,6 +55,24 @@ export default function Toast({ toast, onClose }: ToastProps) {
     </svg>
   );
 
+  const errorIcon = (
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+
+  const icon = variant === 'error' ? errorIcon : successIcon;
+
   return (
     <div
       className={`flex items-start gap-3 p-4 rounded-lg shadow-xl min-w-[320px] max-w-[420px] transition-all duration-300 ${
@@ -60,7 +81,7 @@ export default function Toast({ toast, onClose }: ToastProps) {
       role="alert"
     >
       <div className={`shrink-0 ${iconClass}`}>
-        {successIcon}
+        {icon}
       </div>
       <div className="flex-1">
         <p className={`text-sm font-medium ${textClass}`}>{toast.message}</p>

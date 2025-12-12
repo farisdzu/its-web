@@ -16,15 +16,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     public const ROLE_ADMIN = 'admin';
-    public const ROLE_DEKAN = 'dekan';
-    public const ROLE_UNIT = 'unit';
-    public const ROLE_SDM = 'sdm';
+    public const ROLE_USER = 'user';
 
     public const ROLES = [
         self::ROLE_ADMIN,
-        self::ROLE_DEKAN,
-        self::ROLE_UNIT,
-        self::ROLE_SDM,
+        self::ROLE_USER,
     ];
 
     protected $fillable = [
@@ -99,28 +95,17 @@ class User extends Authenticatable
         return $this->role === $role;
     }
 
-    public function isDekan(): bool
+    public function isUser(): bool
     {
-        return $this->hasRole(self::ROLE_DEKAN);
-    }
-
-    public function isUnit(): bool
-    {
-        return $this->hasRole(self::ROLE_UNIT);
-    }
-
-    public function isSdm(): bool
-    {
-        return $this->hasRole(self::ROLE_SDM);
+        return $this->hasRole(self::ROLE_USER);
     }
 
     public function getDashboardRoute(): string
     {
         return match ($this->role) {
-            self::ROLE_DEKAN => '/dekan',
-            self::ROLE_UNIT => '/unit',
-            self::ROLE_SDM => '/sdm',
-            default => '/sdm',
+            self::ROLE_ADMIN => '/dashboard',
+            self::ROLE_USER => '/dashboard',
+            default => '/dashboard',
         };
     }
 

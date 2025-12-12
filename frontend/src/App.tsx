@@ -11,9 +11,7 @@ import ToastContainer from "./components/ui/toast/ToastContainer";
 
 // Dashboard Pages
 import DashboardAdmin from "./pages/Dashboard/Admin/Index";
-import DashboardDekan from "./pages/Dashboard/Dekan/Index";
-import DashboardUnit from "./pages/Dashboard/Unit/Index";
-import DashboardSDM from "./pages/Dashboard/SDM/Index";
+import DashboardSDM from "./pages/Dashboard/SDM/Index"; // Used as generic dashboard for regular users
 import UserProfiles from "./pages/UserProfiles";
 import OrgUnits from "./pages/OrgUnits";
 
@@ -68,25 +66,9 @@ export default function App() {
               }
             />
             <Route
-              path="/dekan"
+              path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={["dekan"]}>
-                  <DashboardDekan />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/unit"
-              element={
-                <ProtectedRoute allowedRoles={["unit"]}>
-                  <DashboardUnit />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/sdm"
-              element={
-                <ProtectedRoute allowedRoles={["sdm"]}>
+                <ProtectedRoute allowedRoles={["user"]}>
                   <DashboardSDM />
                 </ProtectedRoute>
               }

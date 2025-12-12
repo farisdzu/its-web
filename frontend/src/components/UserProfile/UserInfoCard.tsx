@@ -164,7 +164,7 @@ export default function UserInfoCard() {
                 Role
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user?.role === 'admin' ? 'Admin' : user?.role === 'dekan' ? 'Dekan' : user?.role === 'unit' ? 'Kepala Unit' : 'SDM'}
+                {user?.role === 'admin' ? 'Admin' : 'User'}
               </p>
             </div>
 

@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 export interface Toast {
   id: string;
   message: string;
+  variant?: 'success' | 'error'; // Toast variant
   duration?: number; // in milliseconds, default 3000
 }
 
@@ -10,6 +11,7 @@ interface ToastContextType {
   toasts: Toast[];
   removeToast: (id: string) => void;
   showSuccess: (message: string, duration?: number) => void;
+  showError: (message: string, duration?: number) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -24,7 +26,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const showSuccess = useCallback(
     (message: string, duration: number = 3000) => {
       const id = Math.random().toString(36).substring(2, 9);
-      const newToast: Toast = { id, message, duration };
+      const newToast: Toast = { id, message, variant: 'success', duration };
+
+      setToasts((prev) => [...prev, newToast]);
+
+      // Auto remove after duration
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(id);
+        }, duration);
+      }
+    },
+    [removeToast]
+  );
+
+  const showError = useCallback(
+    (message: string, duration: number = 5000) => {
+      const id = Math.random().toString(36).substring(2, 9);
+      const newToast: Toast = { id, message, variant: 'error', duration };
 
       setToasts((prev) => [...prev, newToast]);
 
@@ -44,6 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         toasts,
         removeToast,
         showSuccess,
+        showError,
       }}
     >
       {children}

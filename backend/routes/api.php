@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OrgUnitController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -55,8 +56,15 @@ Route::middleware('throttle:120,1')->group(function () {
         Route::middleware('role:admin')->prefix('org-units')->group(function () {
             Route::get('/', [OrgUnitController::class, 'index'])->name('org-units.index');
             Route::post('/', [OrgUnitController::class, 'store'])->name('org-units.store');
+            Route::get('/{orgUnit}', [OrgUnitController::class, 'show'])->name('org-units.show');
             Route::patch('/{orgUnit}', [OrgUnitController::class, 'update'])->name('org-units.update');
             Route::delete('/{orgUnit}', [OrgUnitController::class, 'destroy'])->name('org-units.destroy');
+        });
+
+        Route::middleware('role:admin')->prefix('users')->group(function () {
+            Route::get('/', [UserController::class, 'index'])->name('users.index');
+            Route::patch('/{user}/assign', [UserController::class, 'assign'])->name('users.assign');
+            Route::patch('/{user}/unassign', [UserController::class, 'unassign'])->name('users.unassign');
         });
 
         // Example: Role-protected routes

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, memo } from "react";
+import { useDebounce } from "../hooks/useDebounce";
 import PageMeta from "../components/common/PageMeta";
-import { PageHeader } from "../components/common";
+import { PageHeader, SectionHeader } from "../components/common";
+import { UserListItem as UserCard } from "../components/user";
 import Button from "../components/ui/button/Button";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "../components/ui/modal";
 import { ConfirmDialog } from "../components/ui/dialog";
@@ -14,9 +16,10 @@ import Input from "../components/form/input/InputField";
 import { FormField } from "../components/form";
 import Checkbox from "../components/form/input/Checkbox";
 import SelectField from "../components/form/input/SelectField";
-import { orgUnitApi, OrgUnitPayload, OrgUnitTreeNode } from "../services/api";
+import { orgUnitApi, userApi, OrgUnitPayload, OrgUnitTreeNode, UserListItem, AssignUserPayload } from "../services/api";
 import ToastContainer from "../components/ui/toast/ToastContainer";
 import { useToast } from "../context/ToastContext";
+import { LockIcon } from "../icons";
 
 type FormState = {
   id?: number;
@@ -29,7 +32,7 @@ type FormState = {
 };
 
 export default function OrgUnits() {
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [tree, setTree] = useState<OrgUnitTreeNode[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
@@ -49,6 +52,18 @@ export default function OrgUnits() {
     is_active: true,
   });
   const [formError, setFormError] = useState<string>("");
+  const [manageUsers, setManageUsers] = useState<{ isOpen: boolean; orgUnitId: number | null; orgUnitName: string }>({
+    isOpen: false,
+    orgUnitId: null,
+    orgUnitName: "",
+  });
+  const [orgUnitUsers, setOrgUnitUsers] = useState<UserListItem[]>([]);
+  const [allUsers, setAllUsers] = useState<UserListItem[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [assigning, setAssigning] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState<boolean>(true); // Default locked untuk safety
+  const [unlockConfirm, setUnlockConfirm] = useState<boolean>(false);
 
   const flatUnits = useMemo(() => flattenTree(tree), [tree]);
 
@@ -101,12 +116,20 @@ export default function OrgUnits() {
   };
 
   const openCreate = (parentId: number | null) => {
+    if (isLocked) {
+      showError("Struktur organisasi terkunci. Buka kunci terlebih dahulu untuk menambah bagian.");
+      return;
+    }
     resetForm();
     setForm((prev) => ({ ...prev, parent_id: parentId }));
     setIsModalOpen(true);
   };
 
   const openEdit = (node: OrgUnitTreeNode) => {
+    if (isLocked) {
+      showError("Struktur organisasi terkunci. Buka kunci terlebih dahulu untuk mengedit bagian.");
+      return;
+    }
     setForm({
       id: node.id,
       name: node.name,
@@ -184,8 +207,8 @@ export default function OrgUnits() {
       if (errorMessage.toLowerCase().includes("nama") || errorMessage.toLowerCase().includes("unique") || errorMessage.toLowerCase().includes("sudah digunakan")) {
         setFormError(errorMessage);
       } else {
-        // For other errors, show toast
-        showSuccess(errorMessage, 5000);
+        // For other errors, show error toast (red)
+        showError(errorMessage, 5000);
       }
     } finally {
       setSaving(false);
@@ -193,22 +216,36 @@ export default function OrgUnits() {
   };
 
   const handleDeleteClick = (id: number, name: string) => {
-    // Check if node has children
+    if (isLocked) {
+      showError("Struktur organisasi terkunci. Buka kunci terlebih dahulu untuk menghapus bagian.");
+      return;
+    }
+    // Check if node has children or users BEFORE showing modal
     const node = findNodeById(id, tree);
     const hasChildren = Boolean(node && node.children && node.children.length > 0);
+    const hasUsers = Boolean(node && node.user_count && node.user_count > 0);
 
     if (hasChildren) {
       // If has children, show immediate feedback without dialog
       const childCount = node?.children?.length || 0;
-      showSuccess(
+      showError(
         `Tidak bisa menghapus "${name}": masih ada ${childCount} bagian di bawahnya. Hapus atau pindahkan bagian-bagian tersebut terlebih dahulu.`,
         5000
       );
       return;
     }
 
-    // If no children, show confirmation dialog
-    // Backend will still check for users
+    if (hasUsers) {
+      // If has users, show immediate feedback without dialog
+      const userCount = node?.user_count || 0;
+      showError(
+        `Tidak bisa menghapus "${name}": masih ada ${userCount} user di bagian ini. Unassign atau pindahkan user tersebut terlebih dahulu.`,
+        5000
+      );
+      return;
+    }
+
+    // If no children and no users, show confirmation dialog
     setDeleteConfirm({ isOpen: true, id, name });
   };
 
@@ -225,7 +262,7 @@ export default function OrgUnits() {
     } catch (error: any) {
       console.error(error);
       // Show error message from backend (e.g., if there are users)
-      showSuccess(error?.message || "Gagal menghapus unit.", 5000);
+      showError(error?.message || "Gagal menghapus unit.", 5000);
     } finally {
       setDeleting(false);
     }
@@ -235,6 +272,148 @@ export default function OrgUnits() {
     setDeleteConfirm({ isOpen: false, id: null, name: "" });
   };
 
+  const handleUnlockConfirm = () => {
+    setIsLocked(false);
+    setUnlockConfirm(false);
+    showSuccess("Struktur organisasi dibuka. Anda sekarang dapat mengelola bagian.");
+  };
+
+  const handleUnlockCancel = () => {
+    setUnlockConfirm(false);
+  };
+
+  const openManageUsers = async (orgUnitId: number, orgUnitName: string) => {
+    if (isLocked) {
+      showError("Struktur organisasi terkunci. Buka kunci terlebih dahulu untuk mengelola user.");
+      return;
+    }
+    setManageUsers({ isOpen: true, orgUnitId, orgUnitName });
+    setLoadingUsers(true);
+    try {
+      // Load users in this org unit
+      const orgUnitRes = await orgUnitApi.getUsers(orgUnitId);
+      if (orgUnitRes.success && orgUnitRes.data) {
+        setOrgUnitUsers(orgUnitRes.data.users || []);
+      }
+
+      // Load all users for assignment
+      const usersRes = await userApi.list();
+      if (usersRes.success && usersRes.data) {
+        setAllUsers(usersRes.data || []);
+      }
+    } catch (error: any) {
+      console.error("Error loading users:", error);
+      showError(error?.message || "Gagal memuat data user.", 5000);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const closeManageUsers = () => {
+    setManageUsers({ isOpen: false, orgUnitId: null, orgUnitName: "" });
+    setOrgUnitUsers([]);
+    setAllUsers([]);
+    setSearchQuery("");
+  };
+
+  const handleAssignUser = async (userId: number, title?: string) => {
+    if (!manageUsers.orgUnitId) return;
+
+    setAssigning(userId);
+    try {
+      const payload: AssignUserPayload = {
+        org_unit_id: manageUsers.orgUnitId,
+        title: title || null,
+      };
+
+      const res = await userApi.assign(userId, payload);
+      if (!res.success) throw new Error(res.message || "Gagal assign user.");
+
+      // Refresh tree FIRST to update user count badge (cache sudah di-clear di backend)
+      await loadTree();
+      
+      // Then reload users in modal
+      await openManageUsers(manageUsers.orgUnitId, manageUsers.orgUnitName);
+    } catch (error: any) {
+      console.error("Error assigning user:", error);
+      showError(error?.message || "Gagal assign user.", 5000);
+    } finally {
+      setAssigning(null);
+    }
+  };
+
+  const handleUnassignUser = async (userId: number) => {
+    try {
+      const res = await userApi.unassign(userId);
+      if (!res.success) throw new Error(res.message || "Gagal unassign user.");
+
+      // Refresh tree FIRST to update user count badge (cache sudah di-clear di backend)
+      await loadTree();
+      
+      // Then reload users in modal
+      if (manageUsers.orgUnitId) {
+        await openManageUsers(manageUsers.orgUnitId, manageUsers.orgUnitName);
+      }
+    } catch (error: any) {
+      console.error("Error unassigning user:", error);
+      showError(error?.message || "Gagal unassign user.", 5000);
+    }
+  };
+
+  // Filter users for assignment (exclude already assigned users)
+  const availableUsers = useMemo(() => {
+    const assignedUserIds = new Set(orgUnitUsers.map(u => u.id));
+    return allUsers.filter(u => !assignedUserIds.has(u.id));
+  }, [allUsers, orgUnitUsers]);
+
+  // Debounce search query to reduce API calls (300ms delay)
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Load users from API when search query changes (debounced)
+  useEffect(() => {
+    if (!manageUsers.isOpen) return;
+
+    const loadSearchResults = async () => {
+      if (!debouncedSearchQuery.trim()) {
+        // If search is empty, reload all users
+        const usersRes = await userApi.list({ per_page: 100 });
+        if (usersRes.success && usersRes.data) {
+          setAllUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+        }
+        return;
+      }
+
+      setLoadingUsers(true);
+      try {
+        const usersRes = await userApi.list({ 
+          search: debouncedSearchQuery,
+          per_page: 100 
+        });
+        if (usersRes.success && usersRes.data) {
+          setAllUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+        }
+      } catch (error: any) {
+        console.error("Error searching users:", error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    loadSearchResults();
+  }, [debouncedSearchQuery, manageUsers.isOpen]);
+
+  // Filter by search query (client-side filter for instant feedback)
+  const filteredAvailableUsers = useMemo(() => {
+    if (!searchQuery.trim()) return availableUsers;
+    const query = searchQuery.toLowerCase();
+    return availableUsers.filter(u =>
+      u.name.toLowerCase().includes(query) ||
+      u.email.toLowerCase().includes(query) ||
+      u.username?.toLowerCase().includes(query) ||
+      u.employee_id?.toLowerCase().includes(query)
+    );
+  }, [availableUsers, searchQuery]);
+
   return (
     <>
       <PageMeta title="Struktur Organisasi" description="Kelola struktur org dinamis" />
@@ -243,11 +422,34 @@ export default function OrgUnits() {
       <div className="space-y-3 sm:space-y-4 px-2 sm:px-0">
         <PageHeader
           title="Struktur Organisasi"
-          description="Tambah/pindah/hapus bagian secara dinamis. Role tetap generik, jabatan jadi title user."
+          description={
+            isLocked 
+              ? "Struktur terkunci. Buka kunci untuk mengelola bagian."
+              : "Tambah/pindah/hapus bagian secara dinamis. Role tetap generik, jabatan jadi title user."
+          }
           action={
-            <Button variant="primary" onClick={() => openCreate(null)}>
-              + Tambah Root
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={isLocked ? "primary" : "outline"}
+                onClick={() => {
+                  if (isLocked) {
+                    setUnlockConfirm(true);
+                  } else {
+                    setIsLocked(true);
+                    showSuccess("Struktur organisasi dikunci. Perubahan tidak dapat dilakukan.");
+                  }
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <LockIcon className={`w-4 h-4 ${isLocked ? "" : "opacity-60"}`} />
+                {isLocked ? "Buka Kunci" : "Kunci"}
+              </Button>
+              {!isLocked && (
+                <Button variant="primary" onClick={() => openCreate(null)}>
+                  + Tambah Root
+                </Button>
+              )}
+            </div>
           }
         />
 
@@ -270,7 +472,16 @@ export default function OrgUnits() {
             ) : (
               <div className="space-y-1 sm:space-y-1.5">
                 {tree.map((node) => (
-                  <TreeNode key={node.id} node={node} onCreate={openCreate} onEdit={openEdit} onDelete={handleDeleteClick} level={0} />
+                  <TreeNode 
+                    key={node.id} 
+                    node={node} 
+                    onCreate={openCreate} 
+                    onEdit={openEdit} 
+                    onDelete={handleDeleteClick}
+                    onManageUsers={openManageUsers}
+                    isLocked={isLocked}
+                    level={0} 
+                  />
                 ))}
               </div>
             )}
@@ -367,21 +578,23 @@ export default function OrgUnits() {
               >
                 Batal
               </Button>
-              <Button
-                size="sm"
-                type="submit"
-                disabled={saving || !form.name.trim()}
-                className="w-full sm:w-auto"
-              >
-                {saving ? (
-                  <span className="flex items-center gap-2">
-                    <SpinnerIcon size="sm" />
-                    Menyimpan...
-                  </span>
-                ) : (
-                  "Simpan"
-                )}
-              </Button>
+              <div title={isLocked ? "Buka kunci struktur terlebih dahulu" : undefined}>
+                <Button
+                  size="sm"
+                  type="submit"
+                  disabled={saving || !form.name.trim() || isLocked}
+                  className="w-full sm:w-auto"
+                >
+                  {saving ? (
+                    <span className="flex items-center gap-2">
+                      <SpinnerIcon size="sm" />
+                      Menyimpan...
+                    </span>
+                  ) : (
+                    "Simpan"
+                  )}
+                </Button>
+              </div>
             </ModalFooter>
           </form>
         </ModalContent>
@@ -408,16 +621,138 @@ export default function OrgUnits() {
         variant="danger"
         isLoading={deleting}
       />
+
+      {/* Unlock Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={unlockConfirm}
+        onClose={handleUnlockCancel}
+        onConfirm={handleUnlockConfirm}
+        title="Buka Kunci Struktur Organisasi"
+        message="Anda yakin ingin membuka kunci struktur organisasi?"
+        description="Ini akan memungkinkan perubahan pada struktur (tambah, edit, hapus bagian). Pastikan Anda memiliki izin untuk melakukan perubahan ini."
+        confirmText="Buka Kunci"
+        cancelText="Batal"
+        variant="default"
+      />
+
+      {/* Manage Users Modal */}
+      <Modal isOpen={manageUsers.isOpen} onClose={closeManageUsers} className="max-w-2xl m-2 sm:m-4">
+        <ModalContent maxWidth="700px">
+          <ModalHeader
+            title={`Kelola User - ${manageUsers.orgUnitName}`}
+            description="Assign atau unassign user ke bagian ini"
+          />
+
+          {loadingUsers ? (
+            <div className="py-8">
+              <LoadingSpinner size="md" text="Memuat data user..." />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Section 1: Users di Bagian Ini */}
+              <div>
+                <SectionHeader
+                  title="User di Bagian Ini"
+                  count={orgUnitUsers.length}
+                />
+                {orgUnitUsers.length === 0 ? (
+                  <EmptyState
+                    title="Belum ada user"
+                    description="Belum ada user yang di-assign ke bagian ini."
+                    className="py-4"
+                  />
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {orgUnitUsers.map((user) => (
+                      <UserCard
+                        key={user.id}
+                        user={user}
+                        onAction={handleUnassignUser}
+                        actionLabel="Unassign"
+                        actionVariant="outline"
+                        showTitle={true}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Tambah User */}
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                <SectionHeader
+                  title="Tambah User"
+                />
+                <FormField
+                  label="Cari User"
+                  htmlFor="search-user"
+                >
+                  <Input
+                    id="search-user"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari berdasarkan nama, email, username, atau employee ID..."
+                  />
+                </FormField>
+
+                {filteredAvailableUsers.length === 0 ? (
+                  <EmptyState
+                    title={searchQuery.trim() ? "Tidak ada user yang cocok" : "Semua user sudah di-assign"}
+                    description={searchQuery.trim() ? "Coba gunakan kata kunci lain." : "Semua user sudah ter-assign ke bagian lain."}
+                    className="mt-3 py-4"
+                  />
+                ) : (
+                  <div className="mt-3 space-y-1.5 max-h-48 overflow-y-auto">
+                    {filteredAvailableUsers.map((user) => {
+                      const hasOrgUnit = user.org_unit_id !== null && user.org_unit_id !== undefined;
+                      const isAssigning = assigning === user.id;
+
+                      return (
+                        <UserCard
+                          key={user.id}
+                          user={user}
+                          onAction={handleAssignUser}
+                          actionLabel="Assign"
+                          actionVariant="primary"
+                          isLoading={isAssigning}
+                          isDisabled={hasOrgUnit}
+                          disabledTooltip="User sudah memiliki bagian. Unassign dulu dari bagian sebelumnya."
+                          showOrgUnit={true}
+                          showTitle={false}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <ModalFooter>
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={closeManageUsers}
+              className="w-full sm:w-auto"
+            >
+              Tutup
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </>
   );
 }
 
-function TreeNode({
+const TreeNode = memo(function TreeNode({
   node,
   level,
   onCreate,
   onEdit,
   onDelete,
+  onManageUsers,
+  isLocked,
   isLast = false,
   parentPath = [],
 }: {
@@ -426,6 +761,8 @@ function TreeNode({
   onCreate: (parentId: number | null) => void;
   onEdit: (node: OrgUnitTreeNode) => void;
   onDelete: (id: number, name: string) => void;
+  onManageUsers: (orgUnitId: number, orgUnitName: string) => void;
+  isLocked: boolean;
   isLast?: boolean;
   parentPath?: boolean[];
 }) {
@@ -447,9 +784,15 @@ function TreeNode({
         />
 
         {/* Content Card */}
-        <Card padding="sm" hover className="flex-1 ml-1">
+        <Card padding="sm" hover={!isLocked} className={`flex-1 ml-1 ${isLocked ? "opacity-75" : ""}`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+              {/* Lock Indicator */}
+              {isLocked && (
+                <div title="Struktur terkunci">
+                  <LockIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                </div>
+              )}
               {/* Status Indicator */}
               <StatusIndicator
                 status={node.is_active ? "active" : "inactive"}
@@ -473,6 +816,14 @@ function TreeNode({
                     {node.type || "Bagian"}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">·</span>
+                  {node.user_count !== undefined && node.user_count > 0 && (
+                    <>
+                      <Badge variant="light" color="info" size="sm">
+                        {node.user_count} User
+                      </Badge>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">·</span>
+                    </>
+                  )}
                   <Badge
                     variant="light"
                     color={node.is_active ? "success" : "light"}
@@ -489,34 +840,56 @@ function TreeNode({
               className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap"
               style={{ position: "relative", zIndex: 10 }}
             >
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onCreate(node.id)}
-                type="button"
-                className="text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <span className="hidden sm:inline">+ Child</span>
-                <span className="sm:hidden">+</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onEdit(node)}
-                type="button"
-                className="text-xs sm:text-sm px-2 sm:px-3"
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onDelete(node.id, node.name)}
-                type="button"
-                className="text-xs sm:text-sm px-2 sm:px-3"
-              >
-                Hapus
-              </Button>
+              <div title={isLocked ? "Buka kunci struktur terlebih dahulu" : undefined}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onManageUsers(node.id, node.name)}
+                  type="button"
+                  disabled={isLocked}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
+                >
+                  <span className="hidden sm:inline">Kelola User</span>
+                  <span className="sm:hidden">User</span>
+                </Button>
+              </div>
+              <div title={isLocked ? "Buka kunci struktur terlebih dahulu" : undefined}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCreate(node.id)}
+                  type="button"
+                  disabled={isLocked}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
+                >
+                  <span className="hidden sm:inline">+ Child</span>
+                  <span className="sm:hidden">+</span>
+                </Button>
+              </div>
+              <div title={isLocked ? "Buka kunci struktur terlebih dahulu" : undefined}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onEdit(node)}
+                  type="button"
+                  disabled={isLocked}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
+                >
+                  Edit
+                </Button>
+              </div>
+              <div title={isLocked ? "Buka kunci struktur terlebih dahulu" : undefined}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onDelete(node.id, node.name)}
+                  type="button"
+                  disabled={isLocked}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
+                >
+                  Hapus
+                </Button>
+              </div>
             </div>
           </div>
         </Card>
@@ -550,6 +923,8 @@ function TreeNode({
                   onCreate={onCreate}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onManageUsers={onManageUsers}
+                  isLocked={isLocked}
                   isLast={index === node.children!.length - 1}
                   parentPath={[...parentPath, !isLast]}
                 />
@@ -560,7 +935,7 @@ function TreeNode({
       )}
     </div>
   );
-}
+});
 
 function flattenTree(tree: OrgUnitTreeNode[], prefix = "", level = 0): { id: number; indentLabel: string }[] {
   const result: { id: number; indentLabel: string }[] = [];

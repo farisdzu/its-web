@@ -12,7 +12,7 @@ export interface User {
   email: string;
   phone: string | null;
   avatar: string | null;
-  role: 'admin' | 'dekan' | 'unit' | 'sdm';
+  role: 'admin' | 'user';
   employee_id: string | null;
   org_unit_id?: number | null;
   org_unit_name?: string | null;
@@ -61,6 +61,7 @@ export interface OrgUnitTreeNode {
   order: number;
   is_active: boolean;
   parent_id: number | null;
+  user_count?: number;
   children: OrgUnitTreeNode[];
 }
 
@@ -122,6 +123,10 @@ const orgUnitApi = {
     const response = await api.get<ApiResponse<OrgUnitTreeNode[]>>('/org-units');
     return response.data;
   },
+  getUsers: async (id: number): Promise<ApiResponse<OrgUnitWithUsers>> => {
+    const response = await api.get<ApiResponse<OrgUnitWithUsers>>(`/org-units/${id}`);
+    return response.data;
+  },
   create: async (payload: OrgUnitPayload): Promise<ApiResponse<OrgUnitTreeNode>> => {
     const response = await api.post<ApiResponse<OrgUnitTreeNode>>('/org-units', payload);
     return response.data;
@@ -132,6 +137,21 @@ const orgUnitApi = {
   },
   remove: async (id: number): Promise<ApiResponse> => {
     const response = await api.delete<ApiResponse>(`/org-units/${id}`);
+    return response.data;
+  },
+};
+
+const userApi = {
+  list: async (params?: { search?: string; role?: string; page?: number; per_page?: number }): Promise<PaginatedResponse<UserListItem[]>> => {
+    const response = await api.get<PaginatedResponse<UserListItem[]>>('/users', { params });
+    return response.data;
+  },
+  assign: async (id: number, payload: AssignUserPayload): Promise<ApiResponse<UserListItem>> => {
+    const response = await api.patch<ApiResponse<UserListItem>>(`/users/${id}/assign`, payload);
+    return response.data;
+  },
+  unassign: async (id: number): Promise<ApiResponse> => {
+    const response = await api.patch<ApiResponse>(`/users/${id}/unassign`);
     return response.data;
   },
 };
@@ -511,5 +531,6 @@ export const authApi = {
   },
 };
 
-export { api, orgUnitApi };
+export { api, orgUnitApi, userApi };
+export type { UserListItem, OrgUnitWithUsers, AssignUserPayload };
 export default api;

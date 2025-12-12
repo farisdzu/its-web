@@ -29,7 +29,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => User::ROLE_SDM,
+            'role' => User::ROLE_USER,
             'employee_id' => fake()->unique()->numerify('EMP####'),
             'is_active' => true,
             'remember_token' => Str::random(10),
@@ -47,32 +47,12 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the user is a Dekan.
+     * Indicate that the user is a regular user.
      */
-    public function dekan(): static
+    public function user(): static
     {
         return $this->state(fn (array $attributes) => [
-            'role' => User::ROLE_DEKAN,
-        ]);
-    }
-
-    /**
-     * Indicate that the user is a Unit head.
-     */
-    public function unit(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role' => User::ROLE_UNIT,
-        ]);
-    }
-
-    /**
-     * Indicate that the user is SDM.
-     */
-    public function sdm(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role' => User::ROLE_SDM,
+            'role' => User::ROLE_USER,
         ]);
     }
 

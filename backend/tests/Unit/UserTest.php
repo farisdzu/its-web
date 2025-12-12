@@ -12,34 +12,29 @@ beforeEach(function () {
 });
 
 test('user has role method works correctly', function () {
-    $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
+    $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+    $user = User::factory()->create(['role' => User::ROLE_USER]);
 
-    expect($user->hasRole(User::ROLE_ADMIN))->toBeTrue();
-    expect($user->hasRole(User::ROLE_DEKAN))->toBeFalse();
-    expect($user->isDekan())->toBeFalse();
+    expect($admin->hasRole(User::ROLE_ADMIN))->toBeTrue();
+    expect($user->hasRole(User::ROLE_USER))->toBeTrue();
+    expect($admin->hasRole(User::ROLE_USER))->toBeFalse();
+    expect($user->hasRole(User::ROLE_ADMIN))->toBeFalse();
 });
 
 test('user role helper methods work correctly', function () {
     $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-    $dekan = User::factory()->create(['role' => User::ROLE_DEKAN]);
-    $unit = User::factory()->create(['role' => User::ROLE_UNIT]);
-    $sdm = User::factory()->create(['role' => User::ROLE_SDM]);
+    $user = User::factory()->create(['role' => User::ROLE_USER]);
 
-    expect($dekan->isDekan())->toBeTrue();
-    expect($unit->isUnit())->toBeTrue();
-    expect($sdm->isSdm())->toBeTrue();
+    expect($admin->hasRole(User::ROLE_ADMIN))->toBeTrue();
+    expect($user->isUser())->toBeTrue();
 });
 
 test('user get dashboard route returns correct path', function () {
-    $dekan = User::factory()->create(['role' => User::ROLE_DEKAN]);
-    $unit = User::factory()->create(['role' => User::ROLE_UNIT]);
-    $sdm = User::factory()->create(['role' => User::ROLE_SDM]);
     $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+    $user = User::factory()->create(['role' => User::ROLE_USER]);
 
-    expect($dekan->getDashboardRoute())->toBe('/dekan');
-    expect($unit->getDashboardRoute())->toBe('/unit');
-    expect($sdm->getDashboardRoute())->toBe('/sdm');
-    expect($admin->getDashboardRoute())->toBe('/sdm'); // Default fallback
+    expect($admin->getDashboardRoute())->toBe('/dashboard');
+    expect($user->getDashboardRoute())->toBe('/dashboard');
 });
 
 test('avatar is deleted when user is deleted', function () {

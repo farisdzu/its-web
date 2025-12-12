@@ -7,9 +7,7 @@ export default function UserMetaCard() {
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
       admin: 'Admin',
-      dekan: 'Dekan',
-      unit: 'Kepala Unit',
-      sdm: 'SDM',
+      user: 'User',
     };
     return roleMap[role] || role;
   };
