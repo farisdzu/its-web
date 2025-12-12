@@ -1,5 +1,12 @@
 import { useRef, useEffect, useState } from "react";
 
+export { default as ModalHeader } from "./ModalHeader";
+export { default as ModalContent } from "./ModalContent";
+export { default as ModalFooter } from "./ModalFooter";
+export type { ModalHeaderProps } from "./ModalHeader";
+export type { ModalContentProps } from "./ModalContent";
+export type { ModalFooterProps } from "./ModalFooter";
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;

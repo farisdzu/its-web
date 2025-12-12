@@ -26,7 +26,7 @@ class OrgUnitController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', 'unique:org_units,name'],
             'parent_id' => ['nullable', 'exists:org_units,id'],
             'type' => ['nullable', 'string', 'max:100'],
             'code' => ['nullable', 'string', 'max:100'],
@@ -52,7 +52,7 @@ class OrgUnitController extends Controller
     public function update(Request $request, OrgUnit $orgUnit): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('org_units', 'name')->ignore($orgUnit->id)],
             'parent_id' => [
                 'nullable',
                 'exists:org_units,id',

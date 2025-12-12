@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import PageMeta from "../components/common/PageMeta";
+import { PageHeader } from "../components/common";
 import Button from "../components/ui/button/Button";
-import { Modal } from "../components/ui/modal";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from "../components/ui/modal";
 import { ConfirmDialog } from "../components/ui/dialog";
 import { LoadingSpinner, SpinnerIcon } from "../components/ui/loading";
 import { EmptyState } from "../components/ui/empty";
+import { StatusIndicator } from "../components/ui/status";
+import { Card, ContainerCard } from "../components/ui/card";
+import { ExpandButton } from "../components/ui/tree";
+import Badge from "../components/ui/badge/Badge";
 import Input from "../components/form/input/InputField";
-import Label from "../components/form/Label";
+import { FormField } from "../components/form";
 import Checkbox from "../components/form/input/Checkbox";
 import SelectField from "../components/form/input/SelectField";
-import { ChevronDownIcon } from "../icons";
 import { orgUnitApi, OrgUnitPayload, OrgUnitTreeNode } from "../services/api";
 import ToastContainer from "../components/ui/toast/ToastContainer";
 import { useToast } from "../context/ToastContext";
@@ -44,8 +48,21 @@ export default function OrgUnits() {
     order: null,
     is_active: true,
   });
+  const [formError, setFormError] = useState<string>("");
 
   const flatUnits = useMemo(() => flattenTree(tree), [tree]);
+
+  // Helper function to find node in tree by ID
+  const findNodeById = useCallback((id: number, nodes: OrgUnitTreeNode[]): OrgUnitTreeNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children && node.children.length > 0) {
+        const found = findNodeById(id, node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
 
   const loadTree = async () => {
     setLoading(true);
@@ -75,6 +92,7 @@ export default function OrgUnits() {
       order: null,
       is_active: true,
     });
+    setFormError("");
   };
 
   const closeModal = () => {
@@ -101,11 +119,43 @@ export default function OrgUnits() {
     setIsModalOpen(true);
   };
 
+  // Helper function to get all unit names from tree
+  const getAllUnitNames = useCallback((nodes: OrgUnitTreeNode[]): { id: number; name: string }[] => {
+    const result: { id: number; name: string }[] = [];
+    nodes.forEach((node) => {
+      result.push({ id: node.id, name: node.name });
+      if (node.children && node.children.length > 0) {
+        result.push(...getAllUnitNames(node.children));
+      }
+    });
+    return result;
+  }, []);
+
   const handleSave = async () => {
+    // Clear previous error
+    setFormError("");
+
+    // Check for duplicate name in frontend (case-insensitive)
+    const trimmedName = form.name.trim();
+    if (!trimmedName) {
+      setFormError("Nama bagian wajib diisi.");
+      return;
+    }
+
+    const allUnits = getAllUnitNames(tree);
+    const existingUnit = allUnits.find(
+      (unit) => unit.id !== form.id && unit.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existingUnit) {
+      setFormError(`Nama bagian "${trimmedName}" sudah digunakan. Gunakan nama lain.`);
+      return;
+    }
+
     setSaving(true);
     try {
       const payload: OrgUnitPayload = {
-        name: form.name,
+        name: trimmedName,
         parent_id: form.parent_id ?? null,
         type: form.type ?? null,
         code: form.code ?? null,
@@ -129,13 +179,36 @@ export default function OrgUnits() {
     } catch (error: any) {
       const errorMessage = error?.message || "Gagal menyimpan.";
       console.error("Error saving org unit:", error);
-      alert(errorMessage); // Temporary fallback, bisa diganti dengan toast error nanti
+      
+      // Check if error is about duplicate name
+      if (errorMessage.toLowerCase().includes("nama") || errorMessage.toLowerCase().includes("unique") || errorMessage.toLowerCase().includes("sudah digunakan")) {
+        setFormError(errorMessage);
+      } else {
+        // For other errors, show toast
+        showSuccess(errorMessage, 5000);
+      }
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteClick = (id: number, name: string) => {
+    // Check if node has children
+    const node = findNodeById(id, tree);
+    const hasChildren = Boolean(node && node.children && node.children.length > 0);
+
+    if (hasChildren) {
+      // If has children, show immediate feedback without dialog
+      const childCount = node?.children?.length || 0;
+      showSuccess(
+        `Tidak bisa menghapus "${name}": masih ada ${childCount} bagian di bawahnya. Hapus atau pindahkan bagian-bagian tersebut terlebih dahulu.`,
+        5000
+      );
+      return;
+    }
+
+    // If no children, show confirmation dialog
+    // Backend will still check for users
     setDeleteConfirm({ isOpen: true, id, name });
   };
 
@@ -151,7 +224,8 @@ export default function OrgUnits() {
       await loadTree();
     } catch (error: any) {
       console.error(error);
-      showSuccess(error?.message || "Gagal menghapus unit.");
+      // Show error message from backend (e.g., if there are users)
+      showSuccess(error?.message || "Gagal menghapus unit.", 5000);
     } finally {
       setDeleting(false);
     }
@@ -166,25 +240,23 @@ export default function OrgUnits() {
       <PageMeta title="Struktur Organisasi" description="Kelola struktur org dinamis" />
       <ToastContainer />
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Struktur Organisasi</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Tambah/pindah/hapus bagian secara dinamis. Role tetap generik, jabatan jadi title user.
-            </p>
-          </div>
-          <Button variant="primary" onClick={() => openCreate(null)}>
-            + Tambah Root
-          </Button>
-        </div>
+      <div className="space-y-3 sm:space-y-4 px-2 sm:px-0">
+        <PageHeader
+          title="Struktur Organisasi"
+          description="Tambah/pindah/hapus bagian secara dinamis. Role tetap generik, jabatan jadi title user."
+          action={
+            <Button variant="primary" onClick={() => openCreate(null)}>
+              + Tambah Root
+            </Button>
+          }
+        />
 
         {loading ? (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-8">
+          <ContainerCard padding="lg">
             <LoadingSpinner size="md" text="Memuat struktur..." />
-          </div>
+          </ContainerCard>
         ) : (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+          <ContainerCard padding="sm">
             {tree.length === 0 ? (
               <EmptyState
                 title="Belum ada data"
@@ -196,55 +268,62 @@ export default function OrgUnits() {
                 }
               />
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-1 sm:space-y-1.5">
                 {tree.map((node) => (
                   <TreeNode key={node.id} node={node} onCreate={openCreate} onEdit={openEdit} onDelete={handleDeleteClick} level={0} />
                 ))}
               </div>
             )}
-          </div>
+          </ContainerCard>
         )}
       </div>
 
       {/* Modal Form */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} className="max-w-[600px] m-4">
-        <div className="no-scrollbar relative w-full max-w-[600px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-8">
-          <div className="px-2 pr-14">
-            <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              {form.id ? "Edit Bagian" : "Tambah Bagian"}
-            </h4>
-            <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              {form.id 
+      <Modal isOpen={isModalOpen} onClose={closeModal} className="max-w-[600px] m-2 sm:m-4">
+        <ModalContent maxWidth="600px">
+          <ModalHeader
+            title={form.id ? "Edit Bagian" : "Tambah Bagian"}
+            description={
+              form.id
                 ? "Perbarui informasi bagian organisasi."
-                : "Tambahkan bagian baru ke struktur organisasi."}
-            </p>
-          </div>
-          
-          <form 
+                : "Tambahkan bagian baru ke struktur organisasi."
+            }
+          />
+
+          <form
             className="flex flex-col"
             onSubmit={(e) => {
               e.preventDefault();
               handleSave();
             }}
           >
-            <div className="px-2 pb-3 space-y-5">
-              <div>
-                <Label htmlFor="name">
-                  Nama Bagian <span className="text-error-500">*</span>
-                </Label>
+            <div className="px-0 sm:px-2 pb-3 space-y-4 sm:space-y-5">
+              <FormField
+                label="Nama Bagian"
+                htmlFor="name"
+                required
+                error={formError}
+              >
                 <Input
                   id="name"
                   type="text"
                   value={form.name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, name: e.target.value }));
+                    // Clear error when user types
+                    if (formError) setFormError("");
+                  }}
                   placeholder="Nama bagian"
                   disabled={saving}
                   required
+                  error={!!formError}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <Label htmlFor="parent_id">Parent</Label>
+              <FormField
+                label="Parent"
+                htmlFor="parent_id"
+              >
                 <SelectField
                   id="parent_id"
                   value={form.parent_id}
@@ -264,7 +343,7 @@ export default function OrgUnits() {
                   placeholder="(Root)"
                   disabled={saving}
                 />
-              </div>
+              </FormField>
 
               <div>
                 <Checkbox
@@ -277,20 +356,22 @@ export default function OrgUnits() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button 
-                size="sm" 
-                variant="outline" 
+            <ModalFooter>
+              <Button
+                size="sm"
+                variant="outline"
                 type="button"
                 onClick={closeModal}
                 disabled={saving}
+                className="w-full sm:w-auto"
               >
                 Batal
               </Button>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 type="submit"
                 disabled={saving || !form.name.trim()}
+                className="w-full sm:w-auto"
               >
                 {saving ? (
                   <span className="flex items-center gap-2">
@@ -298,12 +379,12 @@ export default function OrgUnits() {
                     Menyimpan...
                   </span>
                 ) : (
-                  'Simpan'
+                  "Simpan"
                 )}
               </Button>
-            </div>
+            </ModalFooter>
           </form>
-        </div>
+        </ModalContent>
       </Modal>
 
       {/* Delete Confirmation Dialog */}
@@ -321,7 +402,7 @@ export default function OrgUnits() {
             ?
           </>
         }
-        description="Pastikan tidak ada child atau user yang terhubung dengan unit ini. Tindakan ini tidak dapat dibatalkan."
+        description="Pastikan tidak ada user yang terhubung dengan unit ini. Jika masih ada user, unit tidak dapat dihapus. Tindakan ini tidak dapat dibatalkan."
         confirmText="Hapus"
         cancelText="Batal"
         variant="danger"
@@ -350,88 +431,95 @@ function TreeNode({
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = Boolean(node.children && node.children.length > 0);
-  const indentSize = 20;
+  // Responsive indent: smaller on mobile (16px), larger on desktop (20px)
+  const indentSize = 16; // Base mobile size
 
   return (
     <div className="relative">
       <div className="relative flex items-start">
         {/* Expand/Collapse Button */}
-        {hasChildren ? (
-          <button
-            type="button"
-            className="flex items-center justify-center w-5 h-5 min-w-5 min-h-5 mt-0.5 rounded-md transition-all duration-200 shrink-0 mr-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-            style={{ marginLeft: `${level * indentSize}px` }}
-            onClick={() => setIsExpanded(!isExpanded)}
-            title={isExpanded ? "Tutup" : "Buka"}
-            aria-label={isExpanded ? "Tutup" : "Buka"}
-          >
-            <ChevronDownIcon 
-              className={`w-4 h-4 text-gray-600 dark:text-gray-400 shrink-0 transition-transform duration-200 ${
-                isExpanded ? 'rotate-0' : '-rotate-90'
-              }`}
-            />
-          </button>
-        ) : (
-          <div
-            className="w-5 h-5 shrink-0 mr-2"
-            style={{ marginLeft: `${level * indentSize}px` }}
-          />
-        )}
+        <ExpandButton
+          isExpanded={isExpanded}
+          onClick={() => setIsExpanded(!isExpanded)}
+          hasChildren={hasChildren}
+          level={level}
+          indentSize={indentSize}
+        />
 
         {/* Content Card */}
-        <div className="flex-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-2.5 hover:border-brand-300 dark:hover:border-brand-700 transition-colors ml-1">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <Card padding="sm" hover className="flex-1 ml-1">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
               {/* Status Indicator */}
-              <div className={`h-2 w-2 rounded-full shrink-0 ${node.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-              
+              <StatusIndicator
+                status={node.is_active ? "active" : "inactive"}
+                size="sm"
+              />
+
               {/* Unit Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <div className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                  <div className="text-xs sm:text-sm font-medium text-gray-800 dark:text-white/90 truncate">
                     {node.name}
                   </div>
                   {level > 0 && (
-                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 shrink-0">
+                    <Badge variant="light" color="light" size="sm">
                       L{level + 1}
-                    </span>
+                    </Badge>
                   )}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {node.type || "Bagian"} · {node.is_active ? "Aktif" : "Nonaktif"}
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {node.type || "Bagian"}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">·</span>
+                  <Badge
+                    variant="light"
+                    color={node.is_active ? "success" : "light"}
+                    size="sm"
+                  >
+                    {node.is_active ? "Aktif" : "Nonaktif"}
+                  </Badge>
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0" style={{ position: 'relative', zIndex: 10 }}>
-              <Button 
-                size="sm" 
-                variant="outline" 
+            <div
+              className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap"
+              style={{ position: "relative", zIndex: 10 }}
+            >
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => onCreate(node.id)}
                 type="button"
+                className="text-xs sm:text-sm px-2 sm:px-3"
               >
-                + Child
+                <span className="hidden sm:inline">+ Child</span>
+                <span className="sm:hidden">+</span>
               </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => onEdit(node)}
                 type="button"
+                className="text-xs sm:text-sm px-2 sm:px-3"
               >
                 Edit
               </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => onDelete(node.id, node.name)}
                 type="button"
+                className="text-xs sm:text-sm px-2 sm:px-3"
               >
                 Hapus
               </Button>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Children */}
@@ -453,7 +541,7 @@ function TreeNode({
               transitionDelay: isExpanded ? '0.05s' : '0s',
             }}
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1 sm:space-y-1.5">
               {node.children.map((child, index) => (
                 <TreeNode
                   key={child.id}
