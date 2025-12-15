@@ -53,6 +53,15 @@ export interface ApiResponse<T = unknown> {
   data?: T;
 }
 
+export interface PaginatedResponse<T = unknown> extends ApiResponse<T> {
+  meta?: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
 export interface OrgUnitTreeNode {
   id: number;
   name: string;
@@ -72,6 +81,15 @@ export interface OrgUnitPayload {
   code?: string | null;
   order?: number | null;
   is_active?: boolean;
+}
+
+export interface OrgUnitWithUsers extends OrgUnitTreeNode {
+  users: UserListItem[];
+}
+
+export interface AssignUserPayload {
+  org_unit_id: number;
+  title?: string | null;
 }
 
 const TOKEN_KEY = 'its_auth_token';
@@ -141,9 +159,92 @@ const orgUnitApi = {
   },
 };
 
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  username?: string | null;
+  phone?: string | null;
+  employee_id?: string | null;
+  role: 'admin' | 'user';
+  password: string;
+  org_unit_id?: number | null;
+  title?: string | null;
+  is_active?: boolean;
+}
+
+export interface UpdateUserPayload {
+  name?: string;
+  email?: string;
+  username?: string | null;
+  phone?: string | null;
+  employee_id?: string | null;
+  role?: 'admin' | 'user';
+  password?: string;
+  org_unit_id?: number | null;
+  title?: string | null;
+  is_active?: boolean;
+}
+
+export interface UserListItem {
+  id: number;
+  name: string;
+  email: string;
+  username: string | null;
+  phone: string | null;
+  employee_id: string | null;
+  role: 'admin' | 'user';
+  org_unit_id: number | null;
+  org_unit_name: string | null;
+  title: string | null;
+  is_active: boolean;
+}
+
+export interface ImportUserValidationError {
+  row: number;
+  column: string;
+  message: string;
+}
+
+export interface ImportUserPreviewData {
+  no: number;
+  nama: string;
+  email: string;
+  username?: string | null;
+  telepon?: string | null;
+  employee_id?: string | null;
+  jabatan?: string | null;
+  password: string;
+}
+
+export interface ImportUserPreviewResponse {
+  success: boolean;
+  data?: ImportUserPreviewData[];
+  errors?: ImportUserValidationError[];
+  message?: string;
+}
+
 const userApi = {
-  list: async (params?: { search?: string; role?: string; page?: number; per_page?: number }): Promise<PaginatedResponse<UserListItem[]>> => {
+  list: async (params?: { 
+    search?: string; 
+    role?: string; 
+    page?: number; 
+    per_page?: number;
+    include_admin?: boolean;
+    include_inactive?: boolean;
+  }): Promise<PaginatedResponse<UserListItem[]>> => {
     const response = await api.get<PaginatedResponse<UserListItem[]>>('/users', { params });
+    return response.data;
+  },
+  store: async (payload: CreateUserPayload): Promise<ApiResponse<UserListItem>> => {
+    const response = await api.post<ApiResponse<UserListItem>>('/users', payload);
+    return response.data;
+  },
+  update: async (id: number, payload: UpdateUserPayload): Promise<ApiResponse<UserListItem>> => {
+    const response = await api.patch<ApiResponse<UserListItem>>(`/users/${id}`, payload);
+    return response.data;
+  },
+  destroy: async (id: number): Promise<ApiResponse> => {
+    const response = await api.delete<ApiResponse>(`/users/${id}`);
     return response.data;
   },
   assign: async (id: number, payload: AssignUserPayload): Promise<ApiResponse<UserListItem>> => {
@@ -152,6 +253,45 @@ const userApi = {
   },
   unassign: async (id: number): Promise<ApiResponse> => {
     const response = await api.patch<ApiResponse>(`/users/${id}/unassign`);
+    return response.data;
+  },
+  downloadTemplate: async (): Promise<void> => {
+    const response = await api.get('/users/import/template', {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Template_Import_User.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+  previewImport: async (file: File): Promise<ImportUserPreviewResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ImportUserPreviewResponse>('/users/import/preview', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  import: async (file: File): Promise<ApiResponse<{ imported: number; failed: number }>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiResponse<{ imported: number; failed: number }>>('/users/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  checkDuplicate: async (field: 'email' | 'username' | 'employee_id', value: string): Promise<ApiResponse<{ exists: boolean }>> => {
+    const response = await api.get<ApiResponse<{ exists: boolean }>>(`/users/check-duplicate`, {
+      params: { field, value },
+    });
     return response.data;
   },
 };
@@ -313,12 +453,9 @@ api.interceptors.response.use(
 
         case 422:
           logError(error, '422 Validation Error');
-          const validationErrors = data?.errors;
-          if (validationErrors) {
-            const firstError = Object.values(validationErrors)[0] as string[];
-            throw new Error(firstError?.[0] || data?.message || 'Data yang dimasukkan tidak valid.');
-          }
-          throw new Error(data?.message || 'Data yang dimasukkan tidak valid.');
+          // Don't throw new Error, keep the original axios error so error.response.data.errors is preserved
+          // This allows components to access the full validation errors
+          return Promise.reject(error);
 
         case 429:
           logError(error, '429 Rate Limit');
@@ -532,5 +669,4 @@ export const authApi = {
 };
 
 export { api, orgUnitApi, userApi };
-export type { UserListItem, OrgUnitWithUsers, AssignUserPayload };
 export default api;

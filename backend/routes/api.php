@@ -24,7 +24,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/check-session', [AuthController::class, 'checkSession'])
         ->middleware('throttle:20,1')
         ->name('auth.check-session');
-    
+
     // Password reset routes
     Route::post('/password/reset/request', [AuthController::class, 'requestPasswordResetOTP'])
         ->middleware('throttle:5,1') // 5 requests per minute
@@ -63,8 +63,15 @@ Route::middleware('throttle:120,1')->group(function () {
 
         Route::middleware('role:admin')->prefix('users')->group(function () {
             Route::get('/', [UserController::class, 'index'])->name('users.index');
+            Route::post('/', [UserController::class, 'store'])->name('users.store');
+            Route::patch('/{user}', [UserController::class, 'update'])->name('users.update');
+            Route::delete('/{user}', [UserController::class, 'destroy'])->name('users.destroy');
             Route::patch('/{user}/assign', [UserController::class, 'assign'])->name('users.assign');
             Route::patch('/{user}/unassign', [UserController::class, 'unassign'])->name('users.unassign');
+            Route::get('/import/template', [UserController::class, 'downloadTemplate'])->name('users.import.template');
+            Route::post('/import/preview', [UserController::class, 'previewImport'])->name('users.import.preview');
+            Route::post('/import', [UserController::class, 'import'])->name('users.import');
+            Route::get('/check-duplicate', [UserController::class, 'checkDuplicate'])->name('users.check-duplicate');
         });
 
         // Example: Role-protected routes
