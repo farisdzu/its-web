@@ -11,7 +11,7 @@ interface SelectFieldProps {
   name?: string;
   value?: string | number | null;
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  options: SelectOption[];
+  options?: SelectOption[];
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -19,6 +19,7 @@ interface SelectFieldProps {
   error?: boolean;
   success?: boolean;
   hint?: string;
+  children?: React.ReactNode;
 }
 
 const SelectField: FC<SelectFieldProps> = ({
@@ -34,6 +35,7 @@ const SelectField: FC<SelectFieldProps> = ({
   error = false,
   success = false,
   hint,
+  children,
 }) => {
   let selectClasses = `h-11 w-full rounded-lg border appearance-none px-4 py-2.5 pr-11 text-sm shadow-theme-xs focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:text-white/90 ${className}`;
 
@@ -65,11 +67,12 @@ const SelectField: FC<SelectFieldProps> = ({
             {placeholder}
           </option>
         )}
-        {options.map((option) => (
+        {options && options.map((option) => (
           <option key={String(option.value)} value={String(option.value)}>
             {option.label}
           </option>
         ))}
+        {children}
       </select>
       {/* Dropdown arrow icon */}
       <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">

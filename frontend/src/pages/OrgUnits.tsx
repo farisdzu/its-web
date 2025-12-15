@@ -629,7 +629,7 @@ export default function OrgUnits() {
         onConfirm={handleUnlockConfirm}
         title="Buka Kunci Struktur Organisasi"
         message="Anda yakin ingin membuka kunci struktur organisasi?"
-        description="Ini akan memungkinkan perubahan pada struktur (tambah, edit, hapus bagian). Pastikan Anda memiliki izin untuk melakukan perubahan ini."
+        description="Ini akan memungkinkan perubahan pada struktur (tambah, edit, hapus bagian)."
         confirmText="Buka Kunci"
         cancelText="Batal"
         variant="default"

@@ -4,6 +4,7 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
+  GroupIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,11 @@ const AppSidebar: React.FC = () => {
                 icon: <GridIcon />,
                 name: "Struktur Organisasi",
                 path: "/org-units",
+              },
+              {
+                icon: <GroupIcon />,
+                name: "Kelola User",
+                path: "/users",
               },
             ]
           : []),

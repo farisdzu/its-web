@@ -14,6 +14,7 @@ import DashboardAdmin from "./pages/Dashboard/Admin/Index";
 import DashboardSDM from "./pages/Dashboard/SDM/Index"; // Used as generic dashboard for regular users
 import UserProfiles from "./pages/UserProfiles";
 import OrgUnits from "./pages/OrgUnits";
+import Users from "./pages/Users";
 
 // Root redirect component - redirects to user's dashboard based on role
 function RootRedirect() {
@@ -78,6 +79,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <OrgUnits />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <Users />
                 </ProtectedRoute>
               }
             />
