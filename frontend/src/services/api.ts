@@ -69,14 +69,16 @@ export interface OrgUnitTreeNode {
   code: string | null;
   order: number;
   is_active: boolean;
-  parent_id: number | null;
+  parent_id: number | null; // Backward compatibility
+  parent_ids?: number[]; // Multiple parents
   user_count?: number;
   children: OrgUnitTreeNode[];
 }
 
 export interface OrgUnitPayload {
   name: string;
-  parent_id?: number | null;
+  parent_id?: number | null; // Backward compatibility
+  parent_ids?: number[]; // Multiple parents
   type?: string | null;
   code?: string | null;
   order?: number | null;

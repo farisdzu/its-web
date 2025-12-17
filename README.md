@@ -211,22 +211,33 @@ Setelah menjalankan seeder, gunakan akun berikut untuk login:
 
 ## 📚 Dokumentasi
 
-### Backend Documentation
+**📖 [Dokumentasi Lengkap](./docs/README.md)** - Index semua dokumentasi
 
-Lihat [`backend/README.md`](./backend/README.md) untuk:
-- API endpoints lengkap
-- Authentication guide
-- Database setup
-- Testing guide
-- Deployment checklist
+### Quick Links
 
-### Frontend Documentation
+#### Development Guides
+- **Frontend:** [Development Guide](./docs/frontend/DEVELOPMENT_GUIDE.md) - Panduan lengkap frontend development
+- **Backend:** [Best Practices](./docs/backend/BEST_PRACTICES.md) - Panduan standar industri backend
 
-Lihat [`frontend/README.md`](./frontend/README.md) untuk:
-- Project structure
-- Component usage
-- API integration
-- Development guide
+#### Performance & Scalability
+- **Scalability:** [Scalability Analysis](./docs/scalability/SCALABILITY_ANALYSIS.md) - Analisis untuk 200+ users
+
+#### Technical Documentation
+- **Backend API:** [`backend/README.md`](./backend/README.md) - API endpoints, authentication, setup
+- **Frontend:** [`frontend/README.md`](./frontend/README.md) - Frontend structure, components, integration
+
+### Dokumentasi Terorganisir
+
+Semua dokumentasi sekarang terorganisir di folder `docs/`:
+```
+docs/
+├── frontend/          # Frontend Development Guides
+├── backend/           # Backend Development Guides  
+├── scalability/       # Scalability & Performance
+└── README.md          # Documentation Index
+```
+
+**Lihat [Documentation Index](./docs/README.md) untuk navigasi lengkap!**
 
 ## 🔌 API Endpoints
 

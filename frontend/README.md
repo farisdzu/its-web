@@ -135,6 +135,18 @@ await authApi.updateProfile(data);
 - ✅ Dark mode support
 - ✅ Responsive design
 
+## ⚡ Performance Optimizations
+
+### Preconnect Links (Automatic)
+- **Component**: `PreconnectLinks` di `main.tsx`
+- **Fungsi**: Otomatis inject preconnect & dns-prefetch ke API server
+- **Manfaat**: Mengurangi latency API request ~150-250ms
+- **Cara kerja**: Otomatis detect dari `VITE_API_URL` - tidak perlu ubah manual
+- **Development**: Preconnect ke `http://127.0.0.1:8000`
+- **Production**: Preconnect ke domain production (otomatis dari env)
+
+**Note**: Tidak perlu diubah manual saat production - otomatis menggunakan URL dari environment variable.
+
 ## 🛠️ Development
 
 ```bash

@@ -11,7 +11,7 @@ import ToastContainer from "./components/ui/toast/ToastContainer";
 
 // Dashboard Pages
 import DashboardAdmin from "./pages/Dashboard/Admin/Index";
-import DashboardSDM from "./pages/Dashboard/SDM/Index"; // Used as generic dashboard for regular users
+import DashboardUser from "./pages/Dashboard/User/Index";
 import UserProfiles from "./pages/UserProfiles";
 import OrgUnits from "./pages/OrgUnits";
 import Users from "./pages/Users";
@@ -70,7 +70,7 @@ export default function App() {
               path="/dashboard"
               element={
                 <ProtectedRoute allowedRoles={["user"]}>
-                  <DashboardSDM />
+                  <DashboardUser />
                 </ProtectedRoute>
               }
             />

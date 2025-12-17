@@ -332,7 +332,7 @@ export default function UserInfoCard() {
                   <Label>Role</Label>
                   <Input 
                     type="text" 
-                    value={user?.role === 'admin' ? 'Admin' : user?.role === 'dekan' ? 'Dekan' : user?.role === 'unit' ? 'Kepala Unit' : 'SDM'}
+                    value={user?.role === 'admin' ? 'Admin' : 'User'}
                     disabled={true}
                     className="bg-gray-50 dark:bg-gray-800/50 cursor-not-allowed"
                   />

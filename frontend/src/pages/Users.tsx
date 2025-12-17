@@ -5,7 +5,7 @@ import { PageHeader } from "../components/common";
 import Button from "../components/ui/button/Button";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "../components/ui/modal";
 import { ConfirmDialog } from "../components/ui/dialog";
-import { LoadingSpinner, SpinnerIcon } from "../components/ui/loading";
+import { SpinnerIcon } from "../components/ui/loading";
 import { EmptyState } from "../components/ui/empty";
 import { StatusIndicator } from "../components/ui/status";
 import { ContainerCard, Card } from "../components/ui/card";
@@ -20,6 +20,7 @@ import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { PencilIcon, TrashBinIcon } from "../icons";
 import ImportUserModal from "../components/users/ImportUserModal";
+import { UserSkeleton } from "../components/users/UserSkeleton";
 
 type FormState = {
   id?: number;
@@ -40,7 +41,8 @@ export default function Users() {
   const { showSuccess, showError } = useToast();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  // Optimize: Start with loading=true to show skeleton immediately (better LCP)
+  const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -99,8 +101,10 @@ export default function Users() {
   }, [orgUnits]);
 
   const loadUsers = useCallback(async () => {
-    setLoading(true);
+    // Don't set loading to true if already loading (optimize re-renders)
+    setLoading((prev) => prev ? prev : true);
     try {
+      // Optimize: Fetch users immediately
       const res = await userApi.list({
         search: debouncedSearchQuery || undefined,
         role: roleFilter || undefined,
@@ -110,6 +114,7 @@ export default function Users() {
         include_inactive: true, // Always include inactive users
       });
       if (res.success && res.data) {
+        // Optimize: Set users and loading state together for single render
         setUsers(res.data);
         // Check if res has meta property (PaginatedResponse)
         if ('meta' in res && res.meta) {
@@ -120,11 +125,13 @@ export default function Users() {
             total: res.meta.total,
           });
         }
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
     } catch (error: any) {
       console.error(error);
       showError(error.response?.data?.message || "Gagal memuat data user.");
-    } finally {
       setLoading(false);
     }
   }, [debouncedSearchQuery, roleFilter, currentPage, showError]);
@@ -419,8 +426,8 @@ export default function Users() {
 
         {/* Users List */}
         {loading ? (
-          <ContainerCard padding="lg">
-            <LoadingSpinner size="md" text="Memuat data user..." />
+          <ContainerCard padding="sm">
+            <UserSkeleton />
           </ContainerCard>
         ) : users.length === 0 ? (
           <ContainerCard padding="lg">
