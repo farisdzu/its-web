@@ -80,13 +80,14 @@ export const Modal: React.FC<ModalProps> = ({
 
   const contentClasses = isFullscreen
     ? "w-full h-full"
-    : "relative w-full rounded-3xl bg-white dark:bg-gray-900";
+    : "relative w-full rounded-2xl sm:rounded-3xl bg-white dark:bg-gray-900 shadow-2xl";
 
   return (
     <div 
-      className={`fixed inset-0 flex items-center justify-center overflow-y-auto modal z-99999 transition-opacity duration-200 ${
+      className={`fixed inset-0 flex items-center justify-center modal z-99999 transition-opacity duration-200 p-4 ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
+      style={{ overflowY: 'auto' }}
     >
       {!isFullscreen && (
         <div
@@ -101,7 +102,7 @@ export const Modal: React.FC<ModalProps> = ({
         className={`${contentClasses} ${className} transition-all duration-200 ease-out ${
           isVisible 
             ? "opacity-100 scale-100" 
-            : "opacity-0 scale-90"
+            : "opacity-0 scale-95"
         }`}
         onClick={(e) => e.stopPropagation()}
       >

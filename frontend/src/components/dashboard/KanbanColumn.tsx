@@ -15,6 +15,8 @@ interface KanbanColumnProps {
   onTaskEdit?: (task: TaskCardData) => void;
   onTaskDelete?: (task: TaskCardData) => void;
   onTaskMove?: (taskId: string | number, newStatus: TaskStatus) => void;
+  onProgressUpdate?: (taskId: string | number, progress: number) => void;
+  onRefresh?: () => void;
   className?: string;
 }
 
@@ -42,20 +44,25 @@ export default function KanbanColumn({
   onTaskEdit,
   onTaskDelete,
   onTaskMove,
+  onProgressUpdate,
+  onRefresh,
   className = "",
 }: KanbanColumnProps) {
   const columnRef = useRef<HTMLDivElement>(null);
 
   // Drop zone for drag & drop
-  const [{ isOver }, drop] = useDrop({
+  const [{ isOver, canDrop }, drop] = useDrop({
     accept: "task",
     drop: (item: { id: string | number; status: TaskStatus }) => {
+      // Only move if dropped in this column and status is different
       if (item.status !== status && onTaskMove) {
         onTaskMove(item.id, status);
+        return { dropped: true, status };
       }
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
     }),
   });
 
@@ -65,9 +72,14 @@ export default function KanbanColumn({
   return (
     <div
       ref={columnRef}
-      className={`flex h-full min-h-[500px] flex-col rounded-xl border ${statusColors[status]} bg-white/50 p-3 transition-colors dark:bg-gray-800/30 ${
-        isOver ? "border-brand-300 bg-brand-50/70 dark:border-brand-600 dark:bg-brand-950/20" : ""
+      className={`flex h-full min-h-[500px] flex-col rounded-xl border ${statusColors[status]} bg-white/50 p-3 transition-all duration-300 dark:bg-gray-800/30 ${
+        isOver && canDrop 
+          ? "border-brand-400 bg-brand-50/90 dark:border-brand-500 dark:bg-brand-950/40 scale-[1.01] shadow-md ring-2 ring-brand-200 dark:ring-brand-800" 
+          : ""
       } ${className}`}
+      style={{
+        touchAction: 'none', // Allow drag and drop on mobile
+      }}
     >
       {/* Column Header */}
       <div className="mb-3 flex items-center justify-between">
@@ -90,7 +102,7 @@ export default function KanbanColumn({
       </div>
 
       {/* Tasks List */}
-      <div className="flex-1 space-y-2.5 overflow-y-auto">
+      <div className="flex-1 space-y-2.5  overflow-y-auto overflow-x-visible min-h-[200px]">
         {tasks.length === 0 ? (
           <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-400 dark:text-gray-500">Tidak ada tugas</p>
@@ -103,6 +115,8 @@ export default function KanbanColumn({
               onClick={onTaskClick}
               onEdit={onTaskEdit}
               onDelete={onTaskDelete}
+              onProgressUpdate={onProgressUpdate}
+              onRefresh={onRefresh}
             />
           ))
         )}

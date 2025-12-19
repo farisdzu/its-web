@@ -117,10 +117,10 @@ class OrgUnitController extends Controller
         if ($parentIds !== null) {
             foreach ($parentIds as $parentId) {
                 if ($this->isCircular($orgUnit->id, $parentId, $parentIds)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Parent tidak boleh anak/cucu dari unit ini (menghindari loop).',
-                    ], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Parent tidak boleh anak/cucu dari unit ini (menghindari loop).',
+                ], 422);
                 }
             }
         }

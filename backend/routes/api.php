@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OrgUnitController;
+use App\Http\Controllers\Api\TaskAttachmentController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -72,6 +74,21 @@ Route::middleware('throttle:120,1')->group(function () {
             Route::post('/import/preview', [UserController::class, 'previewImport'])->name('users.import.preview');
             Route::post('/import', [UserController::class, 'import'])->name('users.import');
             Route::get('/check-duplicate', [UserController::class, 'checkDuplicate'])->name('users.check-duplicate');
+        });
+
+        // Tasks routes - accessible to all authenticated users
+        Route::prefix('tasks')->group(function () {
+            Route::get('/', [TaskController::class, 'index'])->name('tasks.index');
+            Route::post('/', [TaskController::class, 'store'])->name('tasks.store');
+            Route::get('/{task}', [TaskController::class, 'show'])->name('tasks.show');
+            Route::patch('/{task}', [TaskController::class, 'update'])->name('tasks.update');
+            Route::delete('/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+            Route::patch('/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.update-status');
+            
+            // Task attachments routes
+            Route::post('/{task}/attachments/file', [TaskAttachmentController::class, 'storeFile'])->name('tasks.attachments.store-file');
+            Route::post('/{task}/attachments/link', [TaskAttachmentController::class, 'storeLink'])->name('tasks.attachments.store-link');
+            Route::delete('/{task}/attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('tasks.attachments.destroy');
         });
 
         // Example: Role-protected routes

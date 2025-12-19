@@ -1,12 +1,15 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import PageMeta from "../../../components/common/PageMeta";
 import MetricCard from "../../../components/common/MetricCard";
 import DashboardHeaderEnhanced from "../../../components/dashboard/DashboardHeaderEnhanced";
 import KanbanBoard from "../../../components/dashboard/KanbanBoard";
 import TaskFilter, { TaskFilters } from "../../../components/dashboard/TaskFilter";
 import { KanbanSkeleton } from "../../../components/dashboard/KanbanSkeleton";
+import TaskFormModal from "../../../components/dashboard/TaskFormModal";
 import { TaskCardData, TaskStatus } from "../../../components/dashboard/TaskCard";
 import { useAuth } from "../../../context/AuthContext";
+import { useToast } from "../../../context/ToastContext";
+import { taskApi } from "../../../services/api";
 import {
   TaskIcon,
   CheckCircleIcon,
@@ -14,165 +17,51 @@ import {
   UserCircleIcon,
 } from "../../../icons";
 
-// Mock Data untuk Dashboard User
-const mockMetrics = {
-  tugasAktif: 8,
-  selesaiBulanIni: 15,
-  deadline: 3,
-  tertunda: 2,
-};
-
-// Mock tasks data
-const mockTasks: TaskCardData[] = [
-  {
-    id: 1,
-    title: "Review dokumen akreditasi prodi",
-    description: "Compile competitor landing page designs for inspiration. Gather best practices...",
-    dueDate: "12 Nov 2025",
-    progress: 0,
-    priority: "tinggi",
-    status: "baru",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-      { id: 2, name: "Jane Smith", avatar: undefined },
-      { id: 3, name: "Bob Wilson", avatar: undefined },
-    ],
-    linksCount: 2,
-    attachmentsCount: 2,
-    createdBy: 1,
-    assignedTo: 1,
-  },
-  {
-    id: 2,
-    title: "Upload laporan penelitian semester ganjil",
-    description: "Complete research report for odd semester. Include methodology and findings...",
-    dueDate: "15 Nov 2025",
-    progress: 50,
-    priority: "tinggi",
-    status: "proses",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-    ],
-    linksCount: 1,
-    attachmentsCount: 3,
-    createdBy: 2,
-    assignedTo: 1,
-  },
-  {
-    id: 3,
-    title: "Revisi RPS mata kuliah Kalkulus",
-    description: "Update course plan for Calculus. Review learning outcomes and assessment methods...",
-    dueDate: "18 Nov 2025",
-    progress: 80,
-    priority: "sedang",
-    status: "proses",
-    assignedUsers: [
-      { id: 2, name: "Jane Smith", avatar: undefined },
-      { id: 3, name: "Bob Wilson", avatar: undefined },
-    ],
-    linksCount: 0,
-    attachmentsCount: 1,
-    createdBy: 1,
-    assignedTo: 2,
-  },
-  {
-    id: 4,
-    title: "Input nilai UTS mahasiswa",
-    description: "Enter midterm exam scores for all students. Verify data accuracy...",
-    dueDate: "20 Nov 2025",
-    progress: 75,
-    priority: "sedang",
-    status: "proses",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-    ],
-    linksCount: 1,
-    attachmentsCount: 0,
-    createdBy: 3,
-    assignedTo: 1,
-  },
-  {
-    id: 5,
-    title: "Bimbingan skripsi mahasiswa",
-    description: "Schedule thesis guidance sessions. Review student progress and provide feedback...",
-    dueDate: "22 Nov 2025",
-    progress: 100,
-    priority: "rendah",
-    status: "selesai",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-      { id: 2, name: "Jane Smith", avatar: undefined },
-    ],
-    linksCount: 0,
-    attachmentsCount: 2,
-    createdBy: 1,
-    assignedTo: 1,
-  },
-  {
-    id: 6,
-    title: "Persiapan materi kuliah minggu depan",
-    description: "Prepare lecture materials for next week. Create slides and handouts...",
-    dueDate: "25 Nov 2025",
-    progress: 0,
-    priority: "rendah",
-    status: "baru",
-    assignedUsers: [],
-    linksCount: 0,
-    attachmentsCount: 0,
-    createdBy: 1,
-    assignedTo: 1,
-  },
-  {
-    id: 7,
-    title: "Laporan BKD Semester Genap 2024",
-    description: "Complete BKD report for even semester 2024. Include teaching, research, and service activities...",
-    dueDate: "25 Nov 2025",
-    progress: 100,
-    priority: "tinggi",
-    status: "selesai",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-    ],
-    linksCount: 2,
-    attachmentsCount: 5,
-    createdBy: 2,
-    assignedTo: 1,
-  },
-  {
-    id: 8,
-    title: "Review Paper Mahasiswa",
-    description: "Review student research paper. Provide constructive feedback and suggestions...",
-    dueDate: "28 Nov 2025",
-    progress: 60,
-    priority: "sedang",
-    status: "review",
-    assignedUsers: [
-      { id: 1, name: "John Doe", avatar: undefined },
-      { id: 3, name: "Bob Wilson", avatar: undefined },
-    ],
-    linksCount: 1,
-    attachmentsCount: 1,
-    createdBy: 3,
-    assignedTo: 1,
-  },
-];
-
 export default function DashboardUser() {
   const { user } = useAuth();
+  const { showError } = useToast();
   const [loading, setLoading] = useState<boolean>(true);
-  const [tasks, setTasks] = useState<TaskCardData[]>(mockTasks);
+  const [tasks, setTasks] = useState<TaskCardData[]>([]);
   const [filters, setFilters] = useState<TaskFilters>({
     status: "all",
     priority: "all",
     type: "all",
     search: "",
   });
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskCardData | null>(null);
+  const [initialStatus, setInitialStatus] = useState<TaskStatus | undefined>();
 
-  // Simulate loading
+  // Load tasks from API
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await taskApi.list({
+        status: filters.status !== "all" ? filters.status : undefined,
+        priority: filters.priority !== "all" ? filters.priority : undefined,
+        type: filters.type !== "all" ? filters.type : undefined,
+        search: filters.search || undefined,
+      });
+      
+      if (res.success && res.data) {
+        setTasks(res.data);
+      } else {
+        showError(res.message || "Gagal memuat tasks");
+      }
+    } catch (error: any) {
+      console.error(error);
+      showError(error.response?.data?.message || "Terjadi kesalahan saat memuat tasks");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, showError]);
+
+  // Load tasks on mount and when filters change
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+    loadTasks();
+  }, [loadTasks]);
 
   // Filter tasks based on filters
   const filteredTasks = useMemo(() => {
@@ -230,33 +119,175 @@ export default function DashboardUser() {
     };
   }, [tasks]);
 
-  const handleTaskMove = useCallback((taskId: string | number, newStatus: TaskStatus) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId ? { ...task, status: newStatus } : task
-      )
-    );
-  }, []);
+  const handleTaskMove = useCallback(async (taskId: string | number, newStatus: TaskStatus) => {
+    try {
+      // Find current task to check progress
+      const currentTask = tasks.find((t) => t.id === taskId);
+      const currentProgress = currentTask?.progress || 0;
+
+      // Auto-set progress based on status
+      let newProgress = currentProgress;
+      if (newStatus === "proses" && currentProgress === 0) {
+        // Set to 25% when moved to "proses" if still 0%
+        newProgress = 25;
+      } else if (newStatus === "review" && currentProgress < 75) {
+        // Set to 75% when moved to "review"
+        newProgress = 75;
+      } else if (newStatus === "selesai") {
+        // Always set to 100% when moved to "selesai"
+        newProgress = 100;
+      }
+
+      // Update both status and progress if needed
+      const updates: Promise<any>[] = [
+        taskApi.updateStatus(Number(taskId), newStatus),
+      ];
+
+      if (newProgress !== currentProgress) {
+        updates.push(taskApi.update(Number(taskId), { progress: newProgress }));
+      }
+
+      const results = await Promise.all(updates);
+      const statusRes = results[0];
+
+      if (statusRes.success) {
+        // Update local state
+        setTasks((prevTasks) =>
+          prevTasks.map((task) =>
+            task.id === taskId
+              ? { ...task, status: newStatus, progress: newProgress }
+              : task
+          )
+        );
+      } else {
+        showError(statusRes.message || "Gagal memperbarui status task");
+      }
+    } catch (error: any) {
+      console.error(error);
+      showError(error.response?.data?.message || "Terjadi kesalahan saat memperbarui status");
+    }
+  }, [tasks, showError]);
 
   const handleTaskClick = useCallback((task: TaskCardData) => {
-    // TODO: Open task detail modal
-    console.log("Task clicked:", task);
+    // Open edit modal when task is clicked
+    setSelectedTask(task);
+    setInitialStatus(undefined);
+    setIsModalOpen(true);
   }, []);
 
   const handleTaskEdit = useCallback((task: TaskCardData) => {
-    // TODO: Open task edit modal
-    console.log("Task edit:", task);
+    setSelectedTask(task);
+    setInitialStatus(undefined);
+    setIsModalOpen(true);
   }, []);
 
-  const handleTaskDelete = useCallback((task: TaskCardData) => {
-    // TODO: Confirm and delete task
-    setTasks((prevTasks) => prevTasks.filter((t) => t.id !== task.id));
-  }, []);
+  const handleTaskDelete = useCallback(async (task: TaskCardData) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus task ini?")) {
+      return;
+    }
+
+    try {
+      const res = await taskApi.destroy(Number(task.id));
+      if (res.success) {
+        // Remove from local state
+        setTasks((prevTasks) => prevTasks.filter((t) => t.id !== task.id));
+      } else {
+        showError(res.message || "Gagal menghapus task");
+      }
+    } catch (error: any) {
+      console.error(error);
+      showError(error.response?.data?.message || "Terjadi kesalahan saat menghapus task");
+    }
+  }, [showError]);
 
   const handleAddTask = useCallback((status: TaskStatus) => {
-    // TODO: Open add task modal with pre-selected status
-    console.log("Add task to status:", status);
+    setSelectedTask(null);
+    setInitialStatus(status);
+    setIsModalOpen(true);
   }, []);
+
+  const handleTaskSuccess = useCallback(() => {
+    // Refresh tasks after create/update
+    loadTasks();
+  }, [loadTasks]);
+
+  // Track pending progress updates to prevent multiple concurrent requests
+  const progressUpdateRefs = useRef<Map<string | number, NodeJS.Timeout>>(new Map());
+  const progressUpdateInProgress = useRef<Set<string | number>>(new Set());
+  const previousProgressRef = useRef<Map<string | number, number>>(new Map());
+
+  const handleProgressUpdate = useCallback(async (taskId: string | number, progress: number, immediate = false) => {
+    // Clear any pending debounce for this task
+    const existingTimeout = progressUpdateRefs.current.get(taskId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Store previous progress for potential revert
+    setTasks((prevTasks) => {
+      const currentTask = prevTasks.find((t) => t.id === taskId);
+      if (currentTask && !previousProgressRef.current.has(taskId)) {
+        previousProgressRef.current.set(taskId, currentTask.progress || 0);
+      }
+      return prevTasks.map((task) =>
+        task.id === taskId ? { ...task, progress } : task
+      );
+    });
+
+    // For preset buttons, save immediately; for slider, debounce
+    const saveProgress = async () => {
+      // Check if another update is already in progress for this task
+      if (progressUpdateInProgress.current.has(taskId)) {
+        return;
+      }
+
+      progressUpdateInProgress.current.add(taskId);
+
+      try {
+        const res = await taskApi.update(Number(taskId), { progress });
+        if (!res.success) {
+          // Revert local state on error
+          const previousProgress = previousProgressRef.current.get(taskId) || 0;
+          setTasks((prevTasks) =>
+            prevTasks.map((task) =>
+              task.id === taskId ? { ...task, progress: previousProgress } : task
+            )
+          );
+          previousProgressRef.current.delete(taskId);
+          showError(res.message || "Gagal memperbarui progress");
+        } else {
+          // Update previous progress on success
+          previousProgressRef.current.set(taskId, progress);
+        }
+      } catch (error: any) {
+        console.error(error);
+        // Revert local state on error
+        const previousProgress = previousProgressRef.current.get(taskId) || 0;
+        setTasks((prevTasks) =>
+          prevTasks.map((task) =>
+            task.id === taskId ? { ...task, progress: previousProgress } : task
+          )
+        );
+        previousProgressRef.current.delete(taskId);
+        // Only show error if it's not a network error or cancellation
+        if (error.code !== 'ERR_CANCELED' && !error.message?.includes('canceled')) {
+          showError(error.response?.data?.message || "Terjadi kesalahan saat memperbarui progress");
+        }
+      } finally {
+        progressUpdateInProgress.current.delete(taskId);
+        progressUpdateRefs.current.delete(taskId);
+      }
+    };
+
+    if (immediate) {
+      // Save immediately for preset buttons
+      saveProgress();
+    } else {
+      // Debounce for slider
+      const timeoutId = setTimeout(saveProgress, 500);
+      progressUpdateRefs.current.set(taskId, timeoutId);
+    }
+  }, [showError]);
 
   return (
     <>
@@ -272,10 +303,10 @@ export default function DashboardUser() {
           icon={<UserCircleIcon className="size-7" />}
           userName={user?.name || "User"}
           userRole={user?.role || "user"}
-          searchValue={filters.search}
-          onSearchChange={(value) => setFilters({ ...filters, search: value })}
           onAddNew={() => handleAddTask("baru")}
-          onShare={() => console.log("Share")}
+          onShare={() => {
+            // TODO: Implement share functionality
+          }}
         />
 
         {/* Summary Cards */}
@@ -318,8 +349,23 @@ export default function DashboardUser() {
             onTaskEdit={handleTaskEdit}
             onTaskDelete={handleTaskDelete}
             onTaskMove={handleTaskMove}
+            onProgressUpdate={handleProgressUpdate}
+            onRefresh={loadTasks}
           />
         )}
+
+        {/* Task Form Modal */}
+        <TaskFormModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedTask(null);
+            setInitialStatus(undefined);
+          }}
+          onSuccess={handleTaskSuccess}
+          initialStatus={initialStatus}
+          initialTask={selectedTask}
+        />
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { TaskCardData } from '../components/dashboard/TaskCard';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -670,5 +671,112 @@ export const authApi = {
   },
 };
 
-export { api, orgUnitApi, userApi };
+export interface CreateTaskPayload {
+  title: string;
+  description?: string;
+  due_date?: string;
+  progress?: number;
+  priority?: 'tinggi' | 'sedang' | 'rendah';
+  status?: 'baru' | 'proses' | 'review' | 'selesai';
+  assigned_to?: number | null;
+  assignee_ids?: number[];
+}
+
+export interface UpdateTaskPayload extends Partial<CreateTaskPayload> {}
+
+export interface TaskDetailData extends TaskCardData {
+  attachments?: TaskAttachment[];
+}
+
+const taskApi = {
+  list: async (params?: {
+    status?: string;
+    priority?: string;
+    type?: string;
+    search?: string;
+  }): Promise<ApiResponse<TaskCardData[]>> => {
+    const response = await api.get<ApiResponse<TaskCardData[]>>('/tasks', { params });
+    return response.data;
+  },
+  store: async (payload: CreateTaskPayload): Promise<ApiResponse<TaskCardData>> => {
+    const response = await api.post<ApiResponse<TaskCardData>>('/tasks', payload);
+    return response.data;
+  },
+  show: async (id: number): Promise<ApiResponse<TaskDetailData>> => {
+    const response = await api.get<ApiResponse<TaskDetailData>>(`/tasks/${id}`);
+    return response.data;
+  },
+  update: async (id: number, payload: UpdateTaskPayload): Promise<ApiResponse<TaskCardData>> => {
+    const response = await api.patch<ApiResponse<TaskCardData>>(`/tasks/${id}`, payload);
+    return response.data;
+  },
+  destroy: async (id: number): Promise<ApiResponse> => {
+    const response = await api.delete<ApiResponse>(`/tasks/${id}`);
+    return response.data;
+  },
+  updateStatus: async (id: number, status: 'baru' | 'proses' | 'review' | 'selesai'): Promise<ApiResponse<TaskCardData>> => {
+    const response = await api.patch<ApiResponse<TaskCardData>>(`/tasks/${id}/status`, { status });
+    return response.data;
+  },
+};
+
+// Task Attachment interfaces
+export interface TaskAttachment {
+  id: number;
+  task_id: number;
+  type: 'file' | 'link';
+  name: string;
+  path?: string | null;
+  url?: string | null;
+  mime_type?: string | null;
+  size?: number | null;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  creator?: {
+    id: number;
+    name: string;
+    avatar?: string | null;
+  };
+}
+
+export interface AddLinkPayload {
+  url: string;
+  name?: string;
+}
+
+// Task Attachment API
+const taskAttachmentApi = {
+  uploadFile: async (taskId: number, file: File): Promise<ApiResponse<TaskAttachment>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiResponse<TaskAttachment>>(
+      `/tasks/${taskId}/attachments/file`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  addLink: async (taskId: number, payload: AddLinkPayload): Promise<ApiResponse<TaskAttachment>> => {
+    const response = await api.post<ApiResponse<TaskAttachment>>(
+      `/tasks/${taskId}/attachments/link`,
+      payload
+    );
+    return response.data;
+  },
+
+  delete: async (taskId: number, attachmentId: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete<ApiResponse<void>>(
+      `/tasks/${taskId}/attachments/${attachmentId}`
+    );
+    return response.data;
+  },
+};
+
+export { api, orgUnitApi, userApi, taskApi, taskAttachmentApi };
 export default api;
