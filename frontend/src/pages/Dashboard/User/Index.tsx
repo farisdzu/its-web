@@ -9,7 +9,7 @@ import TaskFormModal from "../../../components/dashboard/TaskFormModal";
 import { TaskCardData, TaskStatus } from "../../../components/dashboard/TaskCard";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
-import { taskApi } from "../../../services/api";
+import { taskApi, TaskDetailData } from "../../../services/api";
 import {
   TaskIcon,
   CheckCircleIcon,
@@ -19,7 +19,7 @@ import {
 
 export default function DashboardUser() {
   const { user } = useAuth();
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
   const [loading, setLoading] = useState<boolean>(true);
   const [tasks, setTasks] = useState<TaskCardData[]>([]);
   const [filters, setFilters] = useState<TaskFilters>({
@@ -32,6 +32,7 @@ export default function DashboardUser() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskCardData | null>(null);
+  const [duplicateTaskData, setDuplicateTaskData] = useState<TaskDetailData | null>(null);
   const [initialStatus, setInitialStatus] = useState<TaskStatus | undefined>();
 
   // Load tasks from API
@@ -177,9 +178,75 @@ export default function DashboardUser() {
 
   const handleTaskEdit = useCallback((task: TaskCardData) => {
     setSelectedTask(task);
+    setDuplicateTaskData(null);
     setInitialStatus(undefined);
     setIsModalOpen(true);
   }, []);
+
+  const handleTaskDuplicate = useCallback(async (task: TaskCardData) => {
+    try {
+      // Load full task detail including attachments
+      const res = await taskApi.show(Number(task.id));
+      if (res.success && res.data) {
+        const taskDetail = res.data as TaskDetailData;
+        
+        // Format task data untuk di-copy ke clipboard
+        const formatTaskData = () => {
+          let text = `📋 ${taskDetail.title}\n\n`;
+          
+          if (taskDetail.description) {
+            text += `📝 Deskripsi:\n${taskDetail.description}\n\n`;
+          }
+          
+          if (taskDetail.dueDate) {
+            text += `📅 Deadline: ${taskDetail.dueDate}\n`;
+          }
+          
+          text += `⚡ Prioritas: ${taskDetail.priority === 'tinggi' ? 'Tinggi' : taskDetail.priority === 'sedang' ? 'Sedang' : 'Rendah'}\n`;
+          text += `📊 Status: ${taskDetail.status === 'baru' ? 'Baru' : taskDetail.status === 'proses' ? 'Proses' : taskDetail.status === 'review' ? 'Review' : 'Selesai'}\n`;
+          
+          if (taskDetail.progress !== undefined) {
+            text += `📈 Progress: ${taskDetail.progress}%\n`;
+          }
+          
+          if (taskDetail.assignedUsers && taskDetail.assignedUsers.length > 0) {
+            text += `👥 Assignee: ${taskDetail.assignedUsers.map(u => u.name).join(', ')}\n`;
+          }
+          
+          if (taskDetail.attachments && taskDetail.attachments.length > 0) {
+            text += `\n📎 Attachments:\n`;
+            taskDetail.attachments.forEach((att, idx) => {
+              if (att.type === 'link') {
+                text += `${idx + 1}. 🔗 ${att.name || att.url} - ${att.url}\n`;
+              } else {
+                text += `${idx + 1}. 📄 ${att.name}${att.size ? ` (${(att.size / 1024).toFixed(1)} KB)` : ''}\n`;
+              }
+            });
+          }
+          
+          return text;
+        };
+        
+        const taskText = formatTaskData();
+        
+        // Copy ke clipboard
+        await navigator.clipboard.writeText(taskText);
+        
+        // Show success message
+        showSuccess("Task berhasil di-copy ke clipboard! Gunakan Ctrl+V untuk paste.");
+      } else {
+        showError(res.message || "Gagal memuat detail task");
+      }
+    } catch (error: any) {
+      console.error(error);
+      // Fallback jika clipboard API tidak tersedia
+      if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
+        showError("Tidak dapat mengakses clipboard. Pastikan browser mendukung clipboard API.");
+      } else {
+        showError(error.response?.data?.message || "Terjadi kesalahan saat menyalin task");
+      }
+    }
+  }, [showError, showSuccess]);
 
   const handleTaskDelete = useCallback(async (task: TaskCardData) => {
     if (!window.confirm("Apakah Anda yakin ingin menghapus task ini?")) {
@@ -301,12 +368,7 @@ export default function DashboardUser() {
         <DashboardHeaderEnhanced
           title="Dashboard User"
           icon={<UserCircleIcon className="size-7" />}
-          userName={user?.name || "User"}
-          userRole={user?.role || "user"}
           onAddNew={() => handleAddTask("baru")}
-          onShare={() => {
-            // TODO: Implement share functionality
-          }}
         />
 
         {/* Summary Cards */}
@@ -347,6 +409,7 @@ export default function DashboardUser() {
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
             onTaskEdit={handleTaskEdit}
+            onTaskDuplicate={handleTaskDuplicate}
             onTaskDelete={handleTaskDelete}
             onTaskMove={handleTaskMove}
             onProgressUpdate={handleProgressUpdate}
@@ -360,11 +423,13 @@ export default function DashboardUser() {
           onClose={() => {
             setIsModalOpen(false);
             setSelectedTask(null);
+            setDuplicateTaskData(null);
             setInitialStatus(undefined);
           }}
           onSuccess={handleTaskSuccess}
           initialStatus={initialStatus}
           initialTask={selectedTask}
+          duplicateTaskData={duplicateTaskData}
         />
       </div>
     </>

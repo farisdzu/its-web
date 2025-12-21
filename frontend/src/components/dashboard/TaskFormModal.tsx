@@ -17,6 +17,7 @@ interface TaskFormModalProps {
   onSuccess: () => void;
   initialStatus?: TaskStatus;
   initialTask?: TaskCardData | null;
+  duplicateTaskData?: TaskDetailData | null;
 }
 
 export default function TaskFormModal({
@@ -24,6 +25,7 @@ export default function TaskFormModal({
   onClose,
   onSuccess,
   initialStatus,
+  duplicateTaskData,
   initialTask,
 }: TaskFormModalProps) {
   const { showSuccess, showError } = useToast();

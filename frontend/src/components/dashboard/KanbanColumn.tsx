@@ -13,6 +13,7 @@ interface KanbanColumnProps {
   onAddTask?: () => void;
   onTaskClick?: (task: TaskCardData) => void;
   onTaskEdit?: (task: TaskCardData) => void;
+  onTaskDuplicate?: (task: TaskCardData) => void;
   onTaskDelete?: (task: TaskCardData) => void;
   onTaskMove?: (taskId: string | number, newStatus: TaskStatus) => void;
   onProgressUpdate?: (taskId: string | number, progress: number) => void;
@@ -42,6 +43,7 @@ export default function KanbanColumn({
   onAddTask,
   onTaskClick,
   onTaskEdit,
+  onTaskDuplicate,
   onTaskDelete,
   onTaskMove,
   onProgressUpdate,
@@ -114,6 +116,7 @@ export default function KanbanColumn({
               task={task}
               onClick={onTaskClick}
               onEdit={onTaskEdit}
+              onDuplicate={onTaskDuplicate}
               onDelete={onTaskDelete}
               onProgressUpdate={onProgressUpdate}
               onRefresh={onRefresh}

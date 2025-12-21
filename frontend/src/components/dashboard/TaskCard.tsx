@@ -2,7 +2,7 @@ import { memo, useRef, useState, useRef as useRefAlias, useEffect } from "react"
 import { createPortal } from "react-dom";
 import { useDrag } from "react-dnd";
 import Badge from "../ui/badge/Badge";
-import { CalenderIcon, UserIcon, FileIcon, PencilIcon, PaperPlaneIcon } from "../../icons";
+import { CalenderIcon, UserIcon, FileIcon, PencilIcon, PaperPlaneIcon, CopyIcon } from "../../icons";
 import TaskAttachmentsModal from "./TaskAttachmentsModal";
 import TaskDetailModal from "./TaskDetailModal";
 
@@ -34,6 +34,7 @@ interface TaskCardProps {
   task: TaskCardData;
   onClick?: (task: TaskCardData) => void;
   onEdit?: (task: TaskCardData) => void;
+  onDuplicate?: (task: TaskCardData) => void;
   onDelete?: (task: TaskCardData) => void;
   onProgressUpdate?: (taskId: string | number, progress: number, immediate?: boolean) => void;
   onRefresh?: () => void; // Callback untuk refresh task list
@@ -330,6 +331,7 @@ export const TaskCard = memo(function TaskCard({
   task,
   onClick: _onClick, // Keep for compatibility but don't use (we use detail modal instead)
   onEdit,
+  onDuplicate,
   onDelete: _onDelete,
   onProgressUpdate,
   onRefresh,
@@ -400,21 +402,37 @@ export const TaskCard = memo(function TaskCard({
       tabIndex={0}
       aria-label={`Task: ${task.title}`}
     >
-      {/* Edit Button - Show on hover */}
-      {onEdit && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(task);
-          }}
-          className="absolute top-2 right-2 p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-500 dark:hover:text-brand-400 shadow-sm z-10"
-          title="Edit task"
-          aria-label="Edit task"
-        >
-          <PencilIcon className="w-3.5 h-3.5" />
-        </button>
-      )}
+      {/* Action Buttons - Show on hover */}
+      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {onDuplicate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate(task);
+            }}
+            className="p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-500 dark:hover:text-brand-400 shadow-sm"
+            title="Salin task"
+            aria-label="Salin task"
+          >
+            <CopyIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+            className="p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-500 dark:hover:text-brand-400 shadow-sm"
+            title="Edit task"
+            aria-label="Edit task"
+          >
+            <PencilIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
       {/* Title & Description */}
       <div className="mb-2.5">

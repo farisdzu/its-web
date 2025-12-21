@@ -6,10 +6,7 @@ interface DashboardHeaderEnhancedProps {
   title: string;
   subtitle?: string;
   icon: ReactNode;
-  userName?: string;
-  userRole?: string;
   onAddNew?: () => void;
-  onShare?: () => void;
   className?: string;
 }
 
@@ -17,10 +14,7 @@ export default function DashboardHeaderEnhanced({
   title,
   subtitle = "ITS (Integrated Task System)",
   icon,
-  userName = "User",
-  userRole = "user",
   onAddNew,
-  onShare,
   className = "",
 }: DashboardHeaderEnhancedProps) {
   return (
@@ -47,26 +41,14 @@ export default function DashboardHeaderEnhanced({
 
         {/* Right: Action Buttons */}
         <div className="flex items-center gap-2">
-          {onShare && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onShare}
-              className="hidden sm:flex"
-            >
-              Share
-            </Button>
-          )}
           {onAddNew && (
             <Button
               variant="primary"
               size="sm"
               onClick={onAddNew}
-              className="flex items-center gap-2"
+              startIcon={<PlusIcon className="w-5 h-5 text-white fill-white" />}
             >
-              <PlusIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">Tambah Tugas</span>
-              <span className="sm:hidden">Tambah</span>
+              Tambah Tugas
             </Button>
           )}
         </div>

@@ -19,6 +19,7 @@ interface KanbanBoardProps {
   onAddTask?: (status: TaskStatus) => void;
   onTaskClick?: (task: TaskCardData) => void;
   onTaskEdit?: (task: TaskCardData) => void;
+  onTaskDuplicate?: (task: TaskCardData) => void;
   onTaskDelete?: (task: TaskCardData) => void;
   onTaskMove?: (taskId: string | number, newStatus: TaskStatus) => void;
   onProgressUpdate?: (taskId: string | number, progress: number) => void;
@@ -58,6 +59,7 @@ export default function KanbanBoard({
   onAddTask,
   onTaskClick,
   onTaskEdit,
+  onTaskDuplicate,
   onTaskDelete,
   onTaskMove,
   onProgressUpdate,
@@ -166,6 +168,7 @@ export default function KanbanBoard({
                   onAddTask={() => onAddTask?.(column.status)}
                   onTaskClick={onTaskClick}
                   onTaskEdit={onTaskEdit}
+                  onTaskDuplicate={onTaskDuplicate}
                   onTaskDelete={onTaskDelete}
                   onTaskMove={onTaskMove}
                   onProgressUpdate={onProgressUpdate}
