@@ -92,7 +92,17 @@ export default function KanbanColumn({
             {tasks.length}
           </span>
         </div>
-        {onAddTask && (
+        {onAddTask && status === "baru" && (
+          <button
+            onClick={onAddTask}
+            className="flex items-center gap-1.5 rounded-md bg-brand-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700"
+            aria-label={`Tambah tugas baru`}
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>Tambah</span>
+          </button>
+        )}
+        {onAddTask && status !== "baru" && (
           <button
             onClick={onAddTask}
             className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"

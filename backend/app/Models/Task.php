@@ -12,6 +12,14 @@ class Task extends Model
 {
     use HasFactory;
 
+    public const TYPE_TUGAS = 'tugas';
+    public const TYPE_AGENDA = 'agenda';
+
+    public const TYPES = [
+        self::TYPE_TUGAS,
+        self::TYPE_AGENDA,
+    ];
+
     public const PRIORITY_TINGGI = 'tinggi';
     public const PRIORITY_SEDANG = 'sedang';
     public const PRIORITY_RENDAH = 'rendah';
@@ -35,9 +43,13 @@ class Task extends Model
     ];
 
     protected $fillable = [
+        'type',
         'title',
         'description',
         'due_date',
+        'start_time',
+        'end_time',
+        'meeting_link',
         'progress',
         'priority',
         'status',
@@ -49,6 +61,8 @@ class Task extends Model
     {
         return [
             'due_date' => 'date',
+            'start_time' => 'datetime',
+            'end_time' => 'datetime',
             'progress' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -141,5 +155,29 @@ class Task extends Model
             $q->where('title', 'like', "%{$keyword}%")
               ->orWhere('description', 'like', "%{$keyword}%");
         });
+    }
+
+    /**
+     * Scope untuk mendapatkan task berdasarkan type
+     */
+    public function scopeByType($query, string $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    /**
+     * Scope untuk hanya tugas (dengan workflow)
+     */
+    public function scopeTasks($query)
+    {
+        return $query->where('type', self::TYPE_TUGAS);
+    }
+
+    /**
+     * Scope untuk hanya agenda
+     */
+    public function scopeAgendas($query)
+    {
+        return $query->where('type', self::TYPE_AGENDA);
     }
 }

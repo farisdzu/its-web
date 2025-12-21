@@ -6,7 +6,9 @@ import KanbanBoard from "../../../components/dashboard/KanbanBoard";
 import TaskFilter, { TaskFilters } from "../../../components/dashboard/TaskFilter";
 import { KanbanSkeleton } from "../../../components/dashboard/KanbanSkeleton";
 import TaskFormModal from "../../../components/dashboard/TaskFormModal";
-import { TaskCardData, TaskStatus } from "../../../components/dashboard/TaskCard";
+import ItemTypeSelectionModal from "../../../components/dashboard/ItemTypeSelectionModal";
+import AgendaList from "../../../components/dashboard/AgendaList";
+import { TaskCardData, TaskStatus, TaskType } from "../../../components/dashboard/TaskCard";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import { taskApi, TaskDetailData } from "../../../services/api";
@@ -15,6 +17,7 @@ import {
   CheckCircleIcon,
   TimeIcon,
   UserCircleIcon,
+  CalenderIcon,
 } from "../../../icons";
 
 export default function DashboardUser() {
@@ -30,10 +33,12 @@ export default function DashboardUser() {
   });
   
   // Modal state
+  const [isTypeSelectionModalOpen, setIsTypeSelectionModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskCardData | null>(null);
   const [duplicateTaskData, setDuplicateTaskData] = useState<TaskDetailData | null>(null);
   const [initialStatus, setInitialStatus] = useState<TaskStatus | undefined>();
+  const [selectedItemType, setSelectedItemType] = useState<TaskType | undefined>();
 
   // Load tasks from API
   const loadTasks = useCallback(async () => {
@@ -68,6 +73,9 @@ export default function DashboardUser() {
   const filteredTasks = useMemo(() => {
     let filtered = [...tasks];
 
+    // Filter: Only show tugas in Kanban (agenda will be shown in separate list view)
+    filtered = filtered.filter((task) => task.type === "tugas");
+
     // Search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -97,6 +105,11 @@ export default function DashboardUser() {
 
     return filtered;
   }, [tasks, filters, user?.id]);
+
+  // Filter agendas for list view
+  const agendas = useMemo(() => {
+    return tasks.filter((task) => task.type === "agenda");
+  }, [tasks]);
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -249,15 +262,12 @@ export default function DashboardUser() {
   }, [showError, showSuccess]);
 
   const handleTaskDelete = useCallback(async (task: TaskCardData) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus task ini?")) {
-      return;
-    }
-
     try {
       const res = await taskApi.destroy(Number(task.id));
       if (res.success) {
         // Remove from local state
         setTasks((prevTasks) => prevTasks.filter((t) => t.id !== task.id));
+        showSuccess("Task berhasil dihapus");
       } else {
         showError(res.message || "Gagal menghapus task");
       }
@@ -265,10 +275,30 @@ export default function DashboardUser() {
       console.error(error);
       showError(error.response?.data?.message || "Terjadi kesalahan saat menghapus task");
     }
-  }, [showError]);
+  }, [showError, showSuccess]);
+
+  const handleAddItem = useCallback(() => {
+    // Open type selection modal first
+    setIsTypeSelectionModalOpen(true);
+  }, []);
+
+  const handleTypeSelected = useCallback((type: TaskType) => {
+    setSelectedItemType(type);
+    setSelectedTask(null);
+    setDuplicateTaskData(null);
+    if (type === "tugas") {
+      setInitialStatus("baru");
+    } else {
+      setInitialStatus(undefined);
+    }
+    setIsModalOpen(true);
+  }, []);
 
   const handleAddTask = useCallback((status: TaskStatus) => {
+    // For adding task from Kanban (only tugas)
+    setSelectedItemType("tugas");
     setSelectedTask(null);
+    setDuplicateTaskData(null);
     setInitialStatus(status);
     setIsModalOpen(true);
   }, []);
@@ -368,7 +398,7 @@ export default function DashboardUser() {
         <DashboardHeaderEnhanced
           title="Dashboard User"
           icon={<UserCircleIcon className="size-7" />}
-          onAddNew={() => handleAddTask("baru")}
+          onAddNew={handleAddItem}
         />
 
         {/* Summary Cards */}
@@ -417,7 +447,32 @@ export default function DashboardUser() {
           />
         )}
 
-        {/* Task Form Modal */}
+        {/* Agenda List - Separate view for Agenda */}
+        {!loading && agendas.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                <CalenderIcon className="w-5 h-5 text-blue-500" />
+                Agenda
+              </h2>
+            </div>
+            <AgendaList
+              agendas={agendas}
+              onEdit={handleTaskEdit}
+              onDuplicate={handleTaskDuplicate}
+              onDelete={handleTaskDelete}
+            />
+          </div>
+        )}
+
+        {/* Type Selection Modal */}
+        <ItemTypeSelectionModal
+          isOpen={isTypeSelectionModalOpen}
+          onClose={() => setIsTypeSelectionModalOpen(false)}
+          onSelect={handleTypeSelected}
+        />
+
+        {/* Task/Agenda Form Modal */}
         <TaskFormModal
           isOpen={isModalOpen}
           onClose={() => {
@@ -425,11 +480,13 @@ export default function DashboardUser() {
             setSelectedTask(null);
             setDuplicateTaskData(null);
             setInitialStatus(undefined);
+            setSelectedItemType(undefined);
           }}
           onSuccess={handleTaskSuccess}
           initialStatus={initialStatus}
           initialTask={selectedTask}
           duplicateTaskData={duplicateTaskData}
+          itemType={selectedItemType}
         />
       </div>
     </>

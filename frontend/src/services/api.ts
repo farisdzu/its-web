@@ -672,12 +672,21 @@ export const authApi = {
 };
 
 export interface CreateTaskPayload {
+  type: 'tugas' | 'agenda'; // NEW: required
   title: string;
   description?: string;
+  
+  // Fields for Tugas
   due_date?: string;
   progress?: number;
   priority?: 'tinggi' | 'sedang' | 'rendah';
   status?: 'baru' | 'proses' | 'review' | 'selesai';
+  
+  // Fields for Agenda
+  start_time?: string; // Format: "HH:mm"
+  end_time?: string; // Format: "HH:mm"
+  meeting_link?: string;
+  
   assigned_to?: number | null;
   assignee_ids?: number[];
 }
@@ -693,6 +702,7 @@ const taskApi = {
     status?: string;
     priority?: string;
     type?: string;
+    item_type?: 'tugas' | 'agenda'; // NEW: filter by item type
     search?: string;
   }): Promise<ApiResponse<TaskCardData[]>> => {
     const response = await api.get<ApiResponse<TaskCardData[]>>('/tasks', { params });

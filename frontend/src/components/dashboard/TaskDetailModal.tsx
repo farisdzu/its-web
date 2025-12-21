@@ -120,10 +120,9 @@ export default function TaskDetailModal({
   const handleDelete = () => {
     if (!task || !onDelete) return;
     
-    if (confirm("Apakah Anda yakin ingin menghapus task ini?")) {
-      onDelete(task);
-      onClose();
-    }
+    // Hapus langsung tanpa konfirmasi
+    onDelete(task);
+    onClose();
   };
 
   if (!task) return null;

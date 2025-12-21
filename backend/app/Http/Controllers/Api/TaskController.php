@@ -31,7 +31,13 @@ class TaskController extends Controller
             $query->byPriority($request->priority);
         }
 
-        // Filter by type
+        // Filter by item_type (tugas/agenda)
+        if ($request->has('item_type') && in_array($request->item_type, ['tugas', 'agenda'])) {
+            $query->byType($request->item_type);
+        }
+        // If no item_type filter, return all (both tugas and agenda)
+
+        // Filter by type (assigned_to_me, created_by_me, personal)
         if ($request->has('type')) {
             if ($request->type === 'assigned_to_me') {
                 $query->assignedTo($user->id);
@@ -67,14 +73,12 @@ class TaskController extends Controller
 
         // Format response to match frontend TaskCardData interface
         $formattedTasks = $tasks->map(function ($task) {
-            return [
+            $formatted = [
                 'id' => $task->id,
+                'type' => $task->type ?? 'tugas',
                 'title' => $task->title,
                 'description' => $task->description,
                 'dueDate' => $task->due_date ? $task->due_date->format('d M Y') : null,
-                'progress' => $task->progress,
-                'priority' => $task->priority,
-                'status' => $task->status,
                 'assignedUsers' => $task->assignees->map(function ($user) {
                     return [
                         'id' => $user->id,
@@ -87,6 +91,22 @@ class TaskController extends Controller
                 'createdBy' => $task->created_by,
                 'assignedTo' => $task->assigned_to,
             ];
+
+            // Add task-specific fields
+            if ($task->type === Task::TYPE_TUGAS) {
+                $formatted['progress'] = $task->progress;
+                $formatted['priority'] = $task->priority;
+                $formatted['status'] = $task->status;
+            }
+
+            // Add agenda-specific fields
+            if ($task->type === Task::TYPE_AGENDA) {
+                $formatted['startTime'] = $task->start_time ? $task->start_time->format('H:i') : null;
+                $formatted['endTime'] = $task->end_time ? $task->end_time->format('H:i') : null;
+                $formatted['meetingLink'] = $task->meeting_link;
+            }
+
+            return $formatted;
         });
 
         return response()->json([
@@ -104,12 +124,21 @@ class TaskController extends Controller
 
         try {
             $data = $request->validate([
+                'type' => ['required', Rule::in(Task::TYPES)],
                 'title' => ['required', 'string', 'max:255'],
                 'description' => ['nullable', 'string'],
+                
+                // Fields for Tugas
                 'due_date' => ['nullable', 'date'],
                 'progress' => ['nullable', 'integer', 'min:0', 'max:100'],
                 'priority' => ['nullable', Rule::in(Task::PRIORITIES)],
                 'status' => ['nullable', Rule::in(Task::STATUSES)],
+                
+                // Fields for Agenda
+                'start_time' => ['nullable', 'date_format:H:i'],
+                'end_time' => ['nullable', 'date_format:H:i'],
+                'meeting_link' => ['nullable', 'string', 'max:500'],
+                
                 'assigned_to' => ['nullable', 'exists:users,id'],
                 'assignee_ids' => ['nullable', 'array'],
                 'assignee_ids.*' => ['exists:users,id'],
@@ -123,16 +152,32 @@ class TaskController extends Controller
         }
 
         try {
-            $task = Task::create([
+            $taskData = [
+                'type' => $data['type'],
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
-                'due_date' => $data['due_date'] ?? null,
-                'progress' => $data['progress'] ?? 0,
-                'priority' => $data['priority'] ?? Task::PRIORITY_SEDANG,
-                'status' => $data['status'] ?? Task::STATUS_BARU,
                 'created_by' => $user->id,
                 'assigned_to' => $data['assigned_to'] ?? null,
-            ]);
+            ];
+
+            // Add fields based on type
+            if ($data['type'] === Task::TYPE_TUGAS) {
+                $taskData['due_date'] = $data['due_date'] ?? null;
+                $taskData['progress'] = $data['progress'] ?? 0;
+                $taskData['priority'] = $data['priority'] ?? Task::PRIORITY_SEDANG;
+                $taskData['status'] = $data['status'] ?? Task::STATUS_BARU;
+            } elseif ($data['type'] === Task::TYPE_AGENDA) {
+                $taskData['due_date'] = $data['due_date'] ?? null; // Tanggal agenda
+                $taskData['start_time'] = $data['start_time'] ?? null;
+                $taskData['end_time'] = $data['end_time'] ?? null;
+                $taskData['meeting_link'] = $data['meeting_link'] ?? null;
+                // Agenda tidak punya progress, priority, status - set default untuk kompatibilitas database
+                $taskData['progress'] = 0; // Set 0 karena kolom tidak nullable
+                $taskData['priority'] = Task::PRIORITY_SEDANG; // Default untuk kompatibilitas
+                $taskData['status'] = Task::STATUS_BARU; // Default untuk kompatibilitas
+            }
+
+            $task = Task::create($taskData);
 
             // Sync assignees (many-to-many)
             if (isset($data['assignee_ids']) && !empty($data['assignee_ids'])) {
@@ -150,29 +195,43 @@ class TaskController extends Controller
                 },
             ]);
 
+            $responseData = [
+                'id' => $task->id,
+                'type' => $task->type,
+                'title' => $task->title,
+                'description' => $task->description,
+                'dueDate' => $task->due_date ? $task->due_date->format('d M Y') : null,
+                'assignedUsers' => $task->assignees->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'avatar' => $user->avatar,
+                    ];
+                })->toArray(),
+                'linksCount' => $task->links_count ?? 0,
+                'attachmentsCount' => $task->files_count ?? 0,
+                'createdBy' => $task->created_by,
+                'assignedTo' => $task->assigned_to,
+            ];
+
+            // Add task-specific fields
+            if ($task->type === Task::TYPE_TUGAS) {
+                $responseData['progress'] = $task->progress;
+                $responseData['priority'] = $task->priority;
+                $responseData['status'] = $task->status;
+            }
+
+            // Add agenda-specific fields
+            if ($task->type === Task::TYPE_AGENDA) {
+                $responseData['startTime'] = $task->start_time ? $task->start_time->format('H:i') : null;
+                $responseData['endTime'] = $task->end_time ? $task->end_time->format('H:i') : null;
+                $responseData['meetingLink'] = $task->meeting_link;
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Task berhasil dibuat.',
-                'data' => [
-                    'id' => $task->id,
-                    'title' => $task->title,
-                    'description' => $task->description,
-                    'dueDate' => $task->due_date ? $task->due_date->format('d M Y') : null,
-                    'progress' => $task->progress,
-                    'priority' => $task->priority,
-                    'status' => $task->status,
-                    'assignedUsers' => $task->assignees->map(function ($user) {
-                        return [
-                            'id' => $user->id,
-                            'name' => $user->name,
-                            'avatar' => $user->avatar,
-                        ];
-                    })->toArray(),
-                    'linksCount' => $task->links_count ?? 0,
-                    'attachmentsCount' => $task->files_count ?? 0,
-                    'createdBy' => $task->created_by,
-                    'assignedTo' => $task->assigned_to,
-                ],
+                'message' => $task->type === Task::TYPE_TUGAS ? 'Task berhasil dibuat.' : 'Agenda berhasil dibuat.',
+                'data' => $responseData,
             ], 201);
         } catch (\Exception $e) {
             \Log::error('Failed to create task', [
@@ -223,28 +282,24 @@ class TaskController extends Controller
             },
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'id' => $task->id,
-                'title' => $task->title,
-                'description' => $task->description,
-                'dueDate' => $task->due_date ? $task->due_date->format('d M Y') : null,
-                'progress' => $task->progress,
-                'priority' => $task->priority,
-                'status' => $task->status,
-                'assignedUsers' => $task->assignees->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'avatar' => $user->avatar,
-                    ];
-                })->toArray(),
-                'linksCount' => $task->links_count ?? 0,
-                'attachmentsCount' => $task->files_count ?? 0,
-                'createdBy' => $task->created_by,
-                'assignedTo' => $task->assigned_to,
-                'attachments' => $task->attachments->map(function ($attachment) {
+        $responseData = [
+            'id' => $task->id,
+            'type' => $task->type ?? 'tugas',
+            'title' => $task->title,
+            'description' => $task->description,
+            'dueDate' => $task->due_date ? $task->due_date->format('d M Y') : null,
+            'assignedUsers' => $task->assignees->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'avatar' => $user->avatar,
+                ];
+            })->toArray(),
+            'linksCount' => $task->links_count ?? 0,
+            'attachmentsCount' => $task->files_count ?? 0,
+            'createdBy' => $task->created_by,
+            'assignedTo' => $task->assigned_to,
+            'attachments' => $task->attachments->map(function ($attachment) {
                     return [
                         'id' => $attachment->id,
                         'task_id' => $attachment->task_id,
@@ -264,7 +319,25 @@ class TaskController extends Controller
                         ] : null,
                     ];
                 })->toArray(),
-            ],
+        ];
+
+        // Add task-specific fields
+        if ($task->type === Task::TYPE_TUGAS) {
+            $responseData['progress'] = $task->progress;
+            $responseData['priority'] = $task->priority;
+            $responseData['status'] = $task->status;
+        }
+
+        // Add agenda-specific fields
+        if ($task->type === Task::TYPE_AGENDA) {
+            $responseData['startTime'] = $task->start_time ? $task->start_time->format('H:i') : null;
+            $responseData['endTime'] = $task->end_time ? $task->end_time->format('H:i') : null;
+            $responseData['meetingLink'] = $task->meeting_link;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $responseData,
         ]);
     }
 
@@ -286,16 +359,46 @@ class TaskController extends Controller
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            
+            // Fields for Tugas
             'due_date' => ['nullable', 'date'],
             'progress' => ['nullable', 'integer', 'min:0', 'max:100'],
             'priority' => ['nullable', Rule::in(Task::PRIORITIES)],
             'status' => ['nullable', Rule::in(Task::STATUSES)],
+            
+            // Fields for Agenda
+            'start_time' => ['nullable', 'date_format:H:i'],
+            'end_time' => ['nullable', 'date_format:H:i'],
+            'meeting_link' => ['nullable', 'string', 'max:500'],
+            
             'assigned_to' => ['nullable', 'exists:users,id'],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['exists:users,id'],
         ]);
 
-        $task->update($data);
+        // Filter data based on task type
+        $updateData = [];
+        if ($task->type === Task::TYPE_TUGAS) {
+            // Only update task-specific fields
+            if (isset($data['title'])) $updateData['title'] = $data['title'];
+            if (isset($data['description'])) $updateData['description'] = $data['description'];
+            if (isset($data['due_date'])) $updateData['due_date'] = $data['due_date'];
+            if (isset($data['progress'])) $updateData['progress'] = $data['progress'];
+            if (isset($data['priority'])) $updateData['priority'] = $data['priority'];
+            if (isset($data['status'])) $updateData['status'] = $data['status'];
+            if (isset($data['assigned_to'])) $updateData['assigned_to'] = $data['assigned_to'];
+        } elseif ($task->type === Task::TYPE_AGENDA) {
+            // Only update agenda-specific fields
+            if (isset($data['title'])) $updateData['title'] = $data['title'];
+            if (isset($data['description'])) $updateData['description'] = $data['description'];
+            if (isset($data['due_date'])) $updateData['due_date'] = $data['due_date'];
+            if (isset($data['start_time'])) $updateData['start_time'] = $data['start_time'];
+            if (isset($data['end_time'])) $updateData['end_time'] = $data['end_time'];
+            if (isset($data['meeting_link'])) $updateData['meeting_link'] = $data['meeting_link'];
+            if (isset($data['assigned_to'])) $updateData['assigned_to'] = $data['assigned_to'];
+        }
+
+        $task->update($updateData);
 
         // Sync assignees if provided
         if (isset($data['assignee_ids'])) {

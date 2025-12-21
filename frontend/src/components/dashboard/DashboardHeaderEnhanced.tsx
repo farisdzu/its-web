@@ -48,7 +48,7 @@ export default function DashboardHeaderEnhanced({
               onClick={onAddNew}
               startIcon={<PlusIcon className="w-5 h-5 text-white fill-white" />}
             >
-              Tambah Tugas
+              Tambah Item
             </Button>
           )}
         </div>

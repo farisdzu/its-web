@@ -6,17 +6,22 @@ import { CalenderIcon, UserIcon, FileIcon, PencilIcon, PaperPlaneIcon, CopyIcon 
 import TaskAttachmentsModal from "./TaskAttachmentsModal";
 import TaskDetailModal from "./TaskDetailModal";
 
+export type TaskType = "tugas" | "agenda";
 export type TaskPriority = "tinggi" | "sedang" | "rendah";
 export type TaskStatus = "baru" | "proses" | "review" | "selesai";
 
 export interface TaskCardData {
   id: string | number;
+  type: TaskType; // NEW: tugas or agenda
   title: string;
   description?: string;
-  dueDate?: string;
-  progress?: number; // 0-100
-  priority: TaskPriority;
-  status: TaskStatus; // Add status for Kanban grouping
+  dueDate?: string; // For tugas: deadline, for agenda: date
+  startTime?: string; // NEW: For agenda (format: "HH:mm")
+  endTime?: string; // NEW: For agenda (format: "HH:mm")
+  meetingLink?: string; // NEW: For agenda
+  progress?: number; // 0-100, only for tugas
+  priority: TaskPriority; // Only for tugas
+  status: TaskStatus; // Only for tugas
   assignedUsers?: Array<{
     id: number;
     name: string;
@@ -341,13 +346,14 @@ export const TaskCard = memo(function TaskCard({
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Drag & Drop
+  // Drag & Drop - Only for Tugas (Agenda tidak bisa di-drag)
   const [{ isDragging }, drag, preview] = useDrag({
     type: "task",
     item: () => {
       isDraggingRef.current = true;
       return { id: task.id, status: task.status };
     },
+    canDrag: task.type === "tugas", // Only tugas can be dragged
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
@@ -381,6 +387,11 @@ export const TaskCard = memo(function TaskCard({
   };
 
   // onEdit and onDelete are kept in props for future use but currently not implemented in UI
+
+  // Only render for Tugas (Agenda should use AgendaList)
+  if (task.type === "agenda") {
+    return null; // Agenda tidak ditampilkan di TaskCard
+  }
 
   return (
     <div
@@ -418,20 +429,20 @@ export const TaskCard = memo(function TaskCard({
             <CopyIcon className="w-3.5 h-3.5" />
           </button>
         )}
-        {onEdit && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(task);
-            }}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(task);
+          }}
             className="p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-500 dark:hover:text-brand-400 shadow-sm"
-            title="Edit task"
-            aria-label="Edit task"
-          >
-            <PencilIcon className="w-3.5 h-3.5" />
-          </button>
-        )}
+          title="Edit task"
+          aria-label="Edit task"
+        >
+          <PencilIcon className="w-3.5 h-3.5" />
+        </button>
+      )}
       </div>
 
       {/* Title & Description */}
