@@ -4,18 +4,13 @@ import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { 
   CalenderIcon, 
-  UserIcon, 
   FileIcon, 
-  PaperPlaneIcon, 
-  PencilIcon, 
-  CloseIcon,
-  DownloadIcon,
-  ArrowRightIcon
+  PaperPlaneIcon
 } from "../../icons";
-import { taskApi, taskAttachmentApi, TaskAttachment, TaskDetailData, TaskCardData } from "../../services/api";
+import { taskApi, TaskAttachment, TaskDetailData } from "../../services/api";
 import { useToast } from "../../context/ToastContext";
 import TaskAttachmentSection from "./TaskAttachmentSection";
-import { CircularProgress, TaskStatus, TaskPriority } from "./TaskCard";
+import { CircularProgress, TaskStatus, TaskPriority, TaskCardData } from "./TaskCard";
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -23,7 +18,7 @@ interface TaskDetailModalProps {
   task: TaskCardData | null;
   onEdit?: (task: TaskCardData) => void;
   onDelete?: (task: TaskCardData) => void;
-  onProgressUpdate?: (taskId: string | number, progress: number) => void;
+  onProgressUpdate?: (taskId: string | number, progress: number, immediate?: boolean) => void;
   onRefresh?: () => void;
 }
 
@@ -98,19 +93,28 @@ export default function TaskDetailModal({
     onRefresh?.();
   }, [onRefresh]);
 
-  const handleProgressUpdate = async (newProgress: number) => {
+  const handleProgressUpdate = (taskId: string | number, progress: number, immediate?: boolean) => {
     if (!task) return;
     
-    try {
-      await taskApi.update(Number(task.id), { progress: newProgress });
-      if (taskDetail) {
-        setTaskDetail({ ...taskDetail, progress: newProgress });
-      }
-      onProgressUpdate?.(Number(task.id), newProgress);
-      showSuccess("Progress berhasil diperbarui.");
-    } catch (error: any) {
-      showError(error.response?.data?.message || "Gagal memperbarui progress.");
+    // Update local state immediately if immediate flag is true
+    if (immediate && taskDetail) {
+      setTaskDetail({ ...taskDetail, progress });
     }
+    
+    // Call parent callback if provided
+    onProgressUpdate?.(taskId, progress, immediate);
+    
+    // Update via API (async, but don't await to keep function synchronous)
+    taskApi.update(Number(taskId), { progress })
+      .then(() => {
+        if (taskDetail) {
+          setTaskDetail({ ...taskDetail, progress });
+        }
+        showSuccess("Progress berhasil diperbarui.");
+      })
+      .catch((error: any) => {
+        showError(error.response?.data?.message || "Gagal memperbarui progress.");
+      });
   };
 
   const handleDelete = () => {
@@ -192,47 +196,6 @@ export default function TaskDetailModal({
                   <p className="text-xs font-semibold text-gray-900 dark:text-white">
                     {taskDetail.progress || 0}%
                   </p>
-                </div>
-              </div>
-
-              {/* Assigned Users */}
-              <div className="flex items-start gap-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 shrink-0">
-                  <UserIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">
-                    Assigned To
-                  </p>
-                  {taskDetail.assignedUsers && taskDetail.assignedUsers.length > 0 ? (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {taskDetail.assignedUsers.map((user) => (
-                        <div
-                          key={user.id}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
-                        >
-                          {user.avatar ? (
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="w-4 h-4 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-white text-[10px] font-semibold">
-                              {user.name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
-                            {user.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Tidak ada assignee
-                    </p>
-                  )}
                 </div>
               </div>
 

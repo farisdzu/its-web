@@ -22,6 +22,7 @@ export default function TaskAttachmentSection({
   const [isUploading, setIsUploading] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
   const [linkForm, setLinkForm] = useState<AddLinkPayload>({ url: "", name: "" });
+  const [linkErrors, setLinkErrors] = useState<{ url?: string; name?: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,8 +57,12 @@ export default function TaskAttachmentSection({
   };
 
   const handleAddLink = async () => {
+    // Reset errors
+    setLinkErrors({});
+
+    // Validate URL
     if (!linkForm.url.trim()) {
-      showError("URL wajib diisi.");
+      setLinkErrors({ url: "URL wajib diisi." });
       return;
     }
 
@@ -65,7 +70,7 @@ export default function TaskAttachmentSection({
     try {
       new URL(linkForm.url);
     } catch {
-      showError("URL tidak valid.");
+      setLinkErrors({ url: "URL tidak valid. Contoh: https://example.com" });
       return;
     }
 
@@ -75,22 +80,44 @@ export default function TaskAttachmentSection({
       if (res.success && res.data) {
         onAttachmentAdded(res.data);
         showSuccess("Link berhasil ditambahkan.");
+        // Reset form but keep the add link form open
         setLinkForm({ url: "", name: "" });
-        setShowAddLink(false);
+        setLinkErrors({});
+        // Don't close the form - keep it open so user can add more links
+        // setShowAddLink(false);
       } else {
-        showError(res.message || "Gagal menambahkan link.");
+        // If it's a validation error, show as field error
+        if (res.message && (res.message.includes("valid") || res.message.includes("URL"))) {
+          setLinkErrors({ url: res.message });
+        } else {
+          // Only show toast for non-validation errors
+          showError(res.message || "Gagal menambahkan link.");
+        }
       }
     } catch (error: any) {
       console.error(error);
-      showError(error.response?.data?.message || "Terjadi kesalahan saat menambahkan link.");
+      // Handle validation errors as field errors
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const validationErrors: { url?: string; name?: string } = {};
+        if (error.response.data.errors.url) {
+          validationErrors.url = error.response.data.errors.url[0];
+        }
+        if (error.response.data.errors.name) {
+          validationErrors.name = error.response.data.errors.name[0];
+        }
+        setLinkErrors(validationErrors);
+      } else if (error.response?.status === 422 && error.response?.data?.message) {
+        setLinkErrors({ url: error.response.data.message });
+      } else {
+        // Only show toast for fatal errors
+        showError(error.response?.data?.message || "Terjadi kesalahan saat menambahkan link.");
+      }
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleDelete = async (attachmentId: number) => {
-    if (!confirm("Yakin ingin menghapus attachment ini?")) return;
-
     try {
       const res = await taskAttachmentApi.delete(taskId, attachmentId);
       if (res.success) {
@@ -152,20 +179,48 @@ export default function TaskAttachmentSection({
       {/* Add Link Form */}
       {showAddLink && (
         <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
-          <Input
-            type="url"
-            placeholder="https://example.com"
-            value={linkForm.url}
-            onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-            className="text-sm"
-          />
-          <Input
-            type="text"
-            placeholder="Nama link (opsional)"
-            value={linkForm.name}
-            onChange={(e) => setLinkForm({ ...linkForm, name: e.target.value })}
-            className="text-sm"
-          />
+          <div>
+            <Input
+              type="url"
+              placeholder="https://example.com"
+              value={linkForm.url}
+              onChange={(e) => {
+                setLinkForm({ ...linkForm, url: e.target.value });
+                // Clear error when user types
+                if (linkErrors.url) {
+                  setLinkErrors({ ...linkErrors, url: undefined });
+                }
+              }}
+              className="text-sm"
+              error={!!linkErrors.url}
+            />
+            {linkErrors.url && (
+              <p className="mt-1 text-xs text-error-600 dark:text-error-400">
+                {linkErrors.url}
+              </p>
+            )}
+          </div>
+          <div>
+            <Input
+              type="text"
+              placeholder="Nama link (opsional)"
+              value={linkForm.name}
+              onChange={(e) => {
+                setLinkForm({ ...linkForm, name: e.target.value });
+                // Clear error when user types
+                if (linkErrors.name) {
+                  setLinkErrors({ ...linkErrors, name: undefined });
+                }
+              }}
+              className="text-sm"
+              error={!!linkErrors.name}
+            />
+            {linkErrors.name && (
+              <p className="mt-1 text-xs text-error-600 dark:text-error-400">
+                {linkErrors.name}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="primary"
@@ -176,11 +231,12 @@ export default function TaskAttachmentSection({
               {isUploading ? "Menambahkan..." : "Tambahkan"}
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={() => {
                 setShowAddLink(false);
                 setLinkForm({ url: "", name: "" });
+                setLinkErrors({});
               }}
               disabled={isUploading}
             >
